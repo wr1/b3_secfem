@@ -1,0 +1,46 @@
+[project]
+name = "b3_secfem"
+version = "0.1.0"
+description = "Lightweight FEniCSx-based 2D cross-section property solver for composite blade/wing sections."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+# Note: fenics-dolfinx, petsc4py, mpi4py, fenics-ufl, fenics-basix are not
+# distributed as PyPI binary wheels. Install them via the system package
+# manager (Ubuntu/Debian: `apt install fenicsx python3-dolfinx`) or
+# conda-forge/pixi, then create the project venv with
+# `uv venv --system-site-packages` so they remain visible.
+dependencies = [
+    "meshio>=5.3",
+    "numpy",
+    "pydantic>=2",
+    "rich",
+    "b3_mat",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff", "matplotlib", "airfoilmesh"]
+
+[project.scripts]
+b3_secfem = "b3_secfem.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/b3_secfem"]
+
+[tool.uv.sources]
+b3_mat = { path = "../b3_mat" }
+airfoilmesh = { path = "../b3_af" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"

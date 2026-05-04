@@ -1,0 +1,65 @@
+"""SectionResult: solver output container."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+from pydantic import BaseModel, ConfigDict
+
+
+class SectionResult(BaseModel):
+    """Result of a single cross-section solve.
+
+    K, M, S are pure numpy arrays (6, 6) in [Fx, Fy, Fz, Mx, My, Mz] order.
+    Centres are (x, y) tuples in section coordinates.
+
+    u_solutions, C_func, mesh are dolfinx objects retained for downstream
+    strain / stress recovery; they are not validated by Pydantic.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    K: np.ndarray
+    M: np.ndarray
+    S: np.ndarray
+    shear_center: tuple[float, float]
+    tension_center: tuple[float, float]
+    elastic_center: tuple[float, float]
+
+    K_section_xy: float | None = None
+    """Section-averaged in-plane shear stiffness [Pa * m^2].
+
+    NOT part of the 6x6 beam K (gamma_xy is not a beam DOF). Computed
+    by solving an additional cell problem with assumed strain
+    ``(0, 0, 0, 0, 0, 1)``. For an isotropic homogeneous section equals
+    G * A.
+    """
+
+    u_solutions: list[Any] | None = None
+    inplane_shear_warping: Any | None = None
+    """Warping field ``w_xy`` (3D displacement on 2D mesh) returned by the
+    in-plane-shear cell problem. Used by viz.plot_warping for the new
+    7th deformation mode."""
+    C_func: Any | None = None
+    mesh: Any | None = None
+
+    @property
+    def K_gxbeam_order(self) -> np.ndarray:
+        from .post import to_gxbeam_order
+        return to_gxbeam_order(self.K)
+
+    @property
+    def K_anba_order(self) -> np.ndarray:
+        from .post import to_anba_order
+        return to_anba_order(self.K)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return (
+            "SectionResult("
+            f"K[Fz,Fz]={self.K[2, 2]:.3e}, "
+            f"K[Mx,Mx]={self.K[3, 3]:.3e}, "
+            f"K[My,My]={self.K[4, 4]:.3e}, "
+            f"K[Mz,Mz]={self.K[5, 5]:.3e}, "
+            f"shear={self.shear_center}, tension={self.tension_center})"
+        )

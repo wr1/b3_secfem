@@ -1,0 +1,29 @@
+# notes repo — tracked separately
+notes/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Test / coverage / lint caches
+.coverage
+.pytest_cache/
+.ruff_cache/
+
+# Run artifacts
+*.xdmf
+*.h5
+*.vtu
+*.pvd
+results/
+_*_tmp/
+examples/report_out/
+examples/deformed_out/
+examples/cross_check_out/
+
+# Editor / tool state
+.claude/
