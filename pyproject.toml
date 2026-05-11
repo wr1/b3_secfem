@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff", "matplotlib"]
+dev = ["pytest>=8", "ruff", "matplotlib", "airfoilmesh"]
 
 [project.scripts]
 b3_secfem = "b3_secfem.cli:main"
@@ -34,8 +34,9 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = ["src/b3_secfem"]
 
-# Workspace inheritance handles b3_mat; airfoilmesh dev dep is optional and
-# unused in the b3_master integration. Original sources block dropped.
+[tool.uv.sources]
+b3_mat = { path = "../b3_mat" }
+airfoilmesh = { path = "../b3_af" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
