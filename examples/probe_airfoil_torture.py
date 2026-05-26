@@ -14,7 +14,7 @@ engines. Single NACA airfoil mesh, but with:
 
 For each engine we report:
 
-  1. Section centres (sc, tc, mc).
+  1. Section centres (sc, tc, mc via .mass_center; .elastic_center kept as alias).
   2. Full 6×6 K diagonal at the *mesh origin* — these will disagree.
   3. K diagonal **shifted to that engine's own shear centre** —
      the reference-frame artefact should drop out, leaving only real
@@ -172,7 +172,8 @@ def main() -> int:
     K_b3 = res.K   # natural [Fx, Fy, Fz, Mx, My, Mz]
     sc_b3 = np.asarray(res.shear_center)
     tc_b3 = np.asarray(res.tension_center)
-    mc_b3 = np.asarray(res.elastic_center)
+    mc_b3 = np.asarray(res.mass_center)
+    ec_b3 = np.asarray(res.elastic_center)  # compat alias for mass
 
     # ── ANBA4 ─────────────────────────────────────────────────────────────────
     fiber_orient = 90.0 - per_cell_alpha       # ANBA convention: fiber=90 → fibre along z
@@ -204,7 +205,7 @@ def main() -> int:
 
     print("Section centres (sc, tc, mc):")
     print(f"  gxbeam      sc={tuple(sc_gx)}  tc={tuple(tc_gx)}  mc={tuple(mc_gx)}")
-    print(f"  b3_secfem   sc={tuple(sc_b3)}  tc={tuple(tc_b3)}  mc={tuple(mc_b3)}")
+    print(f"  b3_secfem   sc={tuple(sc_b3)}  tc={tuple(tc_b3)}  mc={tuple(mc_b3)}  (elastic alias={tuple(ec_b3)})")
     print(f"  ANBA  (sc derived from S^-1 only): sc={sc_anba_xy}")
     print()
 

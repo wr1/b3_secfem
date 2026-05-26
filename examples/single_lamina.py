@@ -4,6 +4,9 @@ For a unidirectional composite lamina, axial stiffness K[Fz, Fz] should
 be highest when fibres are aligned with the beam axis (alpha = 0) and
 drop sharply as the fibres tilt into the section plane (alpha -> 90 deg)
 where transverse modulus E2 dominates.
+
+Also writes representative PNG plots (with centres + neutral axes) to
+examples/example_out/ for alpha=0° and 45°.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from b3_secfem import (
     OrthotropicMaterial,
     RegionMat,
     SectionInput,
+    plot_section,
     solve,
     write_xdmf,
 )
@@ -60,6 +64,17 @@ def main() -> None:
             res = solve(inp)
             E_eff = res.K[2, 2] / (a * b)
             table.add_row(f"{alpha:.1f}", f"{res.K[2, 2]:.3e}", f"{E_eff:.3e}")
+
+            # For representative orientations, also emit a plot with centres + neutral axes
+            if alpha in (0.0, 45.0):
+                out_dir = Path(__file__).parent / "example_out"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                png = plot_section(
+                    inp, res,
+                    out_dir / f"single_lamina_alpha{int(alpha)}.png",
+                    title=f"Single lamina glass-UD, alpha={alpha:.0f}° (homogeneous → centres at origin)",
+                )
+                print(f"  wrote {png}")  # console not yet in scope, use print
 
     console.print(table)
 

@@ -238,7 +238,7 @@ def i_beam(
     rnd = 1_000_000
 
     def get(x: float, y: float) -> int:
-        key = (int(round(x * rnd)), int(round(y * rnd)))
+        key = (round(x * rnd), round(y * rnd))
         if key in node_index:
             return node_index[key]
         node_index[key] = len(coords)
@@ -404,7 +404,7 @@ def airfoil_solid(
     _write_quad_mesh(path, coords, quads)
 
     # Total area (numerical, by trapezoidal rule on half-thickness)
-    A = 2.0 * np.trapz(half_t, eta * chord)
+    A = 2.0 * np.trapezoid(half_t, eta * chord)
     return path, {"A": A, "chord": chord, "thickness": thickness}
 
 

@@ -132,7 +132,7 @@ def test_iso_rectangle_K_section_xy(tmp_path, iso_steel):
 
 
 def test_iso_rectangle_centres_at_origin(tmp_path, iso_steel):
-    """Symmetric rectangle has tension and elastic centres at the origin."""
+    """Symmetric rectangle has tension, elastic (mass) and mass centres at the origin."""
     a = b = 0.10
     path, _ = _make_rectangle_xdmf(tmp_path, a, b, 16)
     inp = SectionInput(
@@ -142,3 +142,4 @@ def test_iso_rectangle_centres_at_origin(tmp_path, iso_steel):
     res = solve(inp)
     np.testing.assert_allclose(res.tension_center, (0.0, 0.0), atol=1e-12)
     np.testing.assert_allclose(res.elastic_center, (0.0, 0.0), atol=1e-12)
+    np.testing.assert_allclose(res.mass_center, (0.0, 0.0), atol=1e-12)

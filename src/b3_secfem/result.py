@@ -13,6 +13,7 @@ class SectionResult(BaseModel):
 
     K, M, S are pure numpy arrays (6, 6) in [Fx, Fy, Fz, Mx, My, Mz] order.
     Centres are (x, y) tuples in section coordinates.
+    mass_center is the rho-weighted centroid; elastic_center is its alias for compat.
 
     u_solutions, C_func, mesh are dolfinx objects retained for downstream
     strain / stress recovery; they are not validated by Pydantic.
@@ -23,9 +24,18 @@ class SectionResult(BaseModel):
     K: np.ndarray
     M: np.ndarray
     S: np.ndarray
+    R: np.ndarray
+    """6x6 basis-resultant matrix: R[a, i] = a-th generalised-force resultant
+    of the i-th chain-basis strain field. Together with the energy matrix,
+    ``K = R @ inv(S_energy) @ R^T``. Needed by ``recover_unit_load_strains``
+    to map applied unit loads back to basis-field amplitudes via
+    ``gamma = inv(R) @ e_k`` — the basis amplitudes are NOT generalised
+    strains (see solver.py module docstring), so ``inv(K)`` is the wrong
+    weighting."""
     shear_center: tuple[float, float]
     tension_center: tuple[float, float]
     elastic_center: tuple[float, float]
+    mass_center: tuple[float, float]
 
     K_section_xy: float | None = None
     """Section-averaged in-plane shear stiffness [Pa * m^2].
@@ -61,5 +71,5 @@ class SectionResult(BaseModel):
             f"K[Mx,Mx]={self.K[3, 3]:.3e}, "
             f"K[My,My]={self.K[4, 4]:.3e}, "
             f"K[Mz,Mz]={self.K[5, 5]:.3e}, "
-            f"shear={self.shear_center}, tension={self.tension_center})"
+            f"shear={self.shear_center}, tension={self.tension_center}, mass={self.mass_center})"
         )

@@ -63,6 +63,7 @@ def test_hollow_cylinder_centres(tmp_path):
     res = solve(inp)
     np.testing.assert_allclose(res.tension_center, (0.0, 0.0), atol=1e-12)
     np.testing.assert_allclose(res.elastic_center, (0.0, 0.0), atol=1e-12)
+    np.testing.assert_allclose(res.mass_center, (0.0, 0.0), atol=1e-12)
 
 
 def test_hollow_cylinder_shear(tmp_path):
@@ -111,6 +112,7 @@ def test_solid_ellipse_centres(tmp_path):
     res = solve(inp)
     np.testing.assert_allclose(res.tension_center, (0.0, 0.0), atol=1e-6)
     np.testing.assert_allclose(res.elastic_center, (0.0, 0.0), atol=1e-6)
+    np.testing.assert_allclose(res.mass_center, (0.0, 0.0), atol=1e-6)
     np.testing.assert_allclose(res.shear_center, (0.0, 0.0), atol=1e-6)
 
 

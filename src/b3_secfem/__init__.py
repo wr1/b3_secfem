@@ -7,7 +7,8 @@ Pure-numpy surface (no FEniCSx import required):
     materials_from_b3_mat
 
 FEniCSx-dependent surface (import on use):
-    solve, recover_strains, SectionResult, StrainField
+    solve, recover_strains, recover_unit_load_strains,
+    SectionResult, StrainField, UnitLoadStrainField
     read_xdmf, write_xdmf, from_gxbeam_vtu
     to_gxbeam_order, to_anba_order
 """
@@ -15,6 +16,7 @@ FEniCSx-dependent surface (import on use):
 from .config import RegionMat, SectionInput, materials_from_b3_mat
 from .materials import IsotropicMaterial, Material, OrthotropicMaterial
 from .post import to_anba_order, to_gxbeam_order
+from .recovery import StrainField, UnitLoadStrainField
 from .rotation3d import rotate_stiffness_6x6
 
 
@@ -25,8 +27,14 @@ def solve(inp):
 
 
 def recover_strains(result):
-    """Recover per-cell Voigt strain / stress for unit load cases."""
+    """Recover per-cell Voigt strain / stress for the 6 kinematic basis fields."""
     from .recovery import recover_strains as _rec
+    return _rec(result)
+
+
+def recover_unit_load_strains(result):
+    """Recover per-cell Voigt strain / stress for the 6 applied unit load cases [Fx, Fy, Fz, Mx, My, Mz]."""
+    from .recovery import recover_unit_load_strains as _rec
     return _rec(result)
 
 
@@ -46,7 +54,7 @@ def from_gxbeam_vtu(path):
 
 
 def plot_section(inp, res, out_path, **kwargs):
-    """Render mesh + centres + principal axes; see viz.plot_section."""
+    """Render mesh + centres (elastic, mass, shear) + neutral axes; see viz.plot_section."""
     from .viz import plot_section as _ps
     return _ps(inp, res, out_path, **kwargs)
 
@@ -69,8 +77,11 @@ __all__ = [
     "plot_warping",
     "read_xdmf",
     "recover_strains",
+    "recover_unit_load_strains",
     "rotate_stiffness_6x6",
     "solve",
+    "StrainField",
+    "UnitLoadStrainField",
     "to_anba_order",
     "to_gxbeam_order",
     "write_xdmf",

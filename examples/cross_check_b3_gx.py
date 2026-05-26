@@ -337,7 +337,7 @@ def run_case(case: Case, out_dir: Path, with_anba: bool = False) -> dict:
         sc_gx, tc_gx, mc_gx,
         np.asarray(res.shear_center),
         np.asarray(res.tension_center),
-        np.asarray(res.elastic_center),
+        np.asarray(res.mass_center),
         K_anba=K_anba,
     )
 
