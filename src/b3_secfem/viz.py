@@ -1,13 +1,15 @@
-"""2D-section visualisation: mesh + region tags + centres + principal axes.
+"""2D-section visualisation: mesh + region tags + centres + neutral axes.
 
 Renders a single PNG per section showing:
 
   - The quad mesh (grey edges, lightly filled).
   - Region tags as a discrete colour map (when more than one region is
     present in the SectionInput).
-  - The tension, elastic, and shear centres as labelled markers.
-  - Bending principal axes drawn from the elastic centre, scaled by the
-    relative magnitude of the two principal bending stiffnesses.
+  - The tension (elastic stiffness centroid), mass, and shear centres as
+    labelled markers.
+  - Neutral (principal bending) axes drawn from the tension/elastic centre,
+    scaled by the relative magnitude of the two principal bending stiffnesses
+    (eigenvectors of K[3:5,3:5] sub-block, rotated 90° to align with zero-strain lines).
 
 The plot uses matplotlib only (no PyVista); fast to render and sufficient
 for the 2D output the package targets.
@@ -32,7 +34,7 @@ def plot_section(
     figsize: tuple[float, float] | None = None,
     dpi: int = 140,
 ) -> Path:
-    """Render the section + overlay to ``out_path``. Returns the path."""
+    """Render the section + overlay (centres + neutral axes) to ``out_path``. Returns the path."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -106,29 +108,30 @@ def plot_section(
 
 
 def _draw_overlay(ax, res: SectionResult, nodes, bbox):
-    """Draw centres + principal axes; return matplotlib (handles, labels)."""
+    """Draw centres (elastic/tension, mass, shear) + neutral axes; return matplotlib (handles, labels)."""
     handles = []
     labels = []
 
-    cx, cy = res.tension_center
+    tx, ty = res.tension_center
     sx, sy = res.shear_center
     ex, ey = res.elastic_center
+    mx, my = getattr(res, "mass_center", ex)  # fallback for any legacy result
 
-    if np.isfinite(cx) and np.isfinite(cy):
-        h, = ax.plot([cx], [cy], "o", color="#cc0000", markersize=8,
+    if np.isfinite(tx) and np.isfinite(ty):
+        h, = ax.plot([tx], [ty], "o", color="#cc0000", markersize=8,
                      markeredgecolor="white")
         handles.append(h)
-        labels.append(f"tension ({cx:+.2e}, {cy:+.2e})")
-    if np.isfinite(ex) and np.isfinite(ey):
-        h, = ax.plot([ex], [ey], "s", color="#0044aa", markersize=8,
+        labels.append(f"elastic/tension ({tx:+.2e}, {ty:+.2e})")
+    if np.isfinite(mx) and np.isfinite(my):
+        h, = ax.plot([mx], [my], "v", color="#dd6600", markersize=8,
                      markeredgecolor="white")
         handles.append(h)
-        labels.append(f"elastic ({ex:+.2e}, {ey:+.2e})")
+        labels.append(f"mass ({mx:+.2e}, {my:+.2e})")
     if np.isfinite(sx) and np.isfinite(sy):
         h, = ax.plot([sx], [sy], "D", color="#117733", markersize=8,
                      markeredgecolor="white")
         handles.append(h)
-        labels.append(f"shear   ({sx:+.2e}, {sy:+.2e})")
+        labels.append(f"shear ({sx:+.2e}, {sy:+.2e})")
 
     bending_block = res.K[3:5, 3:5]
     if np.all(np.isfinite(bending_block)):
@@ -138,7 +141,8 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
         eigvecs = eigvecs[:, order]
         L = 0.45 * max(bbox[1] - bbox[0], bbox[3] - bbox[2])
         mag = eigvals / eigvals.max()
-        cx_e, cy_e = (ex, ey) if np.isfinite(ex) else (0.0, 0.0)
+        # Neutral axes pass through the tension/elastic (stiffness) centre
+        cx_e, cy_e = (tx, ty) if np.isfinite(tx) else (0.0, 0.0)
         for k, (lam, vec) in enumerate(zip(eigvals, eigvecs.T)):
             ex_dir = np.array([vec[1], -vec[0]])
             ex_dir /= np.linalg.norm(ex_dir)
@@ -149,7 +153,7 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
             lw = 2.0 if k == 0 else 1.4
             h, = ax.plot([x0, x1], [y0, y1], color=color, linewidth=lw)
             handles.append(h)
-            labels.append(f"principal axis {k + 1}\n  EI = {lam:.2e}")
+            labels.append(f"neutral axis {k + 1}\n  EI = {lam:.2e}")
     return handles, labels
 
 
@@ -186,7 +190,12 @@ def _extract_geometry(mesh: Any) -> tuple[np.ndarray, np.ndarray]:
     n_cells = mesh.topology.index_map(cell_dim).size_local
     dofmap = mesh.geometry.dofmap[:n_cells]
     if dofmap.shape[1] != 4:
-        msg = f"plot_section currently supports quad meshes only; got {dofmap.shape[1]}-node cells"
+        msg = (
+            "plot_section / plot_warping currently only support quad meshes "
+            "(4-node cells). Triangular meshes are supported by the solver "
+            "but not yet by the visualizer. Convert your mesh to quads or use "
+            "an external tool (pyvista/paraview) for tris."
+        )
         raise NotImplementedError(msg)
     return nodes, dofmap[:, [0, 2, 3, 1]]
 

@@ -10,13 +10,15 @@ import numpy as np
 def compute_centres(
     mesh: Any, C_func: Any, rho_func: Any, K: np.ndarray, M: np.ndarray
 ) -> dict[str, tuple[float, float]]:
-    """Tension, elastic, and shear centres of the section.
+    """Tension, elastic (mass), shear, and mass centres of the section.
 
-    - Tension centre (axial-stiffness centroid):
+    - Tension centre (axial-stiffness / elastic centroid):
           (xT, yT) = (int E33 x dA, int E33 y dA) / int E33 dA
-      where E33 is the (3, 3) component of the rotated stiffness.
-    - Elastic / mass centre:
-          (xE, yE) = (int rho x dA, int rho y dA) / int rho dA
+      where E33 is the (3, 3) component of the rotated stiffness. This is
+      the point neutral axes pass through for pure bending (no net axial force).
+    - Mass centre (centroid of mass / rho):
+          (xM, yM) = (int rho x dA, int rho y dA) / int rho dA
+    - Elastic centre: alias for mass centre (kept for backward compat in v0.x).
     - Shear centre (xs, ys): the point where unit transverse forces
       (Vx, Vy) produce no rate of twist about z. Derived from the
       compliance ``S = K^{-1}``:
@@ -56,7 +58,12 @@ def compute_centres(
     except np.linalg.LinAlgError:
         pass
 
-    return {"tension": tension, "elastic": elastic, "shear": shear}
+    return {
+        "tension": tension,
+        "mass": elastic,      # the rho one
+        "elastic": elastic,   # compat alias (mass centre)
+        "shear": shear,
+    }
 
 
 def to_gxbeam_order(K: np.ndarray) -> np.ndarray:

@@ -60,11 +60,16 @@ torsion (Mz) — are computed by solving for the warping field with an
 assumed-strain ansatz on each generalised strain. These match analytic
 values to machine precision for isotropic sections.
 
-Pure transverse shear (Fx, Fy) requires a higher-order asymptotic
-expansion (the bending solution must vary in z). v0.1 fills these
-diagonal entries with a Timoshenko placeholder
-`K[Fx, Fx] = K[Fy, Fy] = (5/6) * G_eff * A_total`. v0.2 will implement the
-proper shear formulation.
+Transverse shear (Fx, Fy) is obtained from the Stage-2 d₂ warping
+solution in the Morandini chain (E d₂ = M d₀ − H d₁, with ε_total for the
+shear modes assembled from d₂; see `notes/claude.md`). For simple sections
+this reproduces the expected Saint-Venant values — e.g. K[Fx, Fx] =
+K[Fy, Fy] = (5/6) G A for an isotropic rectangle (verified to mesh
+tolerance in `tests/test_iso_rectangle.py`). Complex airfoils exhibit
+mesh-convergence differences versus gxbeam_section on the shear terms (as
+on torsion); these are documented in the cross-check driver and notes.
+
+The solver and visualization tools are serial-only (single MPI rank). Per-cell material assignment and recovery assume local cell counts match the input arrays. Parallel execution is not yet supported.
 
 See `notes/claude.md` for project context and `notes/theory.md` for the
 mathematical formulation.

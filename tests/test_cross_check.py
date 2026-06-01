@@ -58,7 +58,7 @@ TEST_CASES = [
 
 @pytest.mark.parametrize("case", TEST_CASES, ids=lambda c: c.name)
 def test_vs_gxbeam(tmp_path, case):
-    """K diag (excl. shear placeholder) and centres agree with gxbeam_section."""
+    """K diag (including transverse shear via Stage-2 d₂ warping) and centres agree with gxbeam_section."""
     rec = run_case(case, tmp_path)
 
     K_tol = 0.02 if case.is_iso else 0.05

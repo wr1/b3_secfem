@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     console.print(f"Shear centre:   {res.shear_center}")
     console.print(f"Tension centre: {res.tension_center}")
     console.print(f"Elastic centre: {res.elastic_center}")
+    console.print(f"Mass centre:    {res.mass_center}")
     return 0
 
 

@@ -88,6 +88,21 @@ def solve(inp: SectionInput) -> SectionResult:
 
     C_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, cell_tags)
 
+    if inp.per_cell_material is not None:
+        # Remap per-cell arrays from INPUT (spec) cell ordering to dolfinx
+        # internal cell ordering. dolfinx.mesh.create_mesh renumbers cells
+        # for performance; without this remap, rho_per_cell[k] (carrying the
+        # density of input-tri-k) would land on dolfinx-cell-k which is in
+        # general a DIFFERENT geometric cell. Same shuffling on C_per_cell
+        # corrupts the stiffness assembly. Verified empirically: on a 261-
+        # cell sec_14 mesh, dolfinx renumbers cell 0 -> input-tri 247.
+        # Without this remap, secfem's M[0,0] over-counts by 10.5% and K
+        # diagonal disagrees with ANBA on multi-material sections.
+        oci = np.asarray(mesh.topology.original_cell_index)
+        if oci.shape == (n_cells,) and not np.array_equal(oci, np.arange(n_cells)):
+            rho_per_cell = rho_per_cell[oci]
+            C_per_cell = C_per_cell[oci]
+
     V = make_displacement_space(mesh, degree=inp.degree)
     Q = make_stiffness_space(mesh)
     R_space = make_density_space(mesh)
@@ -202,9 +217,11 @@ def solve(inp: SectionInput) -> SectionResult:
         K=K,
         M=M,
         S=S_compliance,
+        R=R_mat,
         shear_center=centres["shear"],
         tension_center=centres["tension"],
         elastic_center=centres["elastic"],
+        mass_center=centres["mass"],
         K_section_xy=K_section_xy,
         u_solutions=u_solutions,
         inplane_shear_warping=w_xy,
