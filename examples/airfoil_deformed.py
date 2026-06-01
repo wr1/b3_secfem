@@ -25,11 +25,10 @@ from b3_secfem import (
     plot_warping,
     solve,
 )
+from b3_secfem._meshlib import airfoil_hollow  # noqa: E402
 
 ROOT = Path(__file__).parent.resolve()
 OUT = ROOT / "deformed_out"
-sys.path.insert(0, str(ROOT.parent / "tests"))
-from _meshlib import airfoil_hollow  # noqa: E402
 
 
 def _glass_ud():

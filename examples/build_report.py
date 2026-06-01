@@ -32,17 +32,15 @@ from b3_secfem import (
     write_xdmf,
 )
 
-ROOT = Path(__file__).parent.resolve()
-OUT = ROOT / "report_out"
-TESTS = ROOT.parent / "tests"
-sys.path.insert(0, str(TESTS))
-from _meshlib import (  # noqa: E402
+from b3_secfem._meshlib import (  # noqa: E402
     airfoil_hollow,
     hollow_cylinder,
     hollow_ellipse,
     i_beam,
     solid_ellipse,
 )
+ROOT = Path(__file__).parent.resolve()
+OUT = ROOT / "report_out"
 
 
 # ---------------------------------------------------------------------------

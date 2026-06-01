@@ -62,20 +62,22 @@ def _write_quad_mesh(
     domain = ufl.Mesh(e)
     mesh = dmesh.create_mesh(MPI.COMM_WORLD, quads_dolfinx, domain, coords)
 
-    if cell_tags is not None:
-        cell_dim = mesh.topology.dim
-        n_cells = cell_tags.size
-        indices = np.arange(n_cells, dtype=np.int32)
-        values = cell_tags.astype(np.int32)
-        mesh.topology.create_connectivity(cell_dim, cell_dim)
-        mt = meshtags(mesh, cell_dim, indices, values)
-        mt.name = "cell_tags"
-        with io.XDMFFile(mesh.comm, str(path), "w") as xf:
-            xf.write_mesh(mesh)
-            xf.write_meshtags(mt, mesh.geometry)
-    else:
-        with io.XDMFFile(mesh.comm, str(path), "w") as xf:
-            xf.write_mesh(mesh)
+    if path is not None:
+        if cell_tags is not None:
+            cell_dim = mesh.topology.dim
+            n_cells = cell_tags.size
+            indices = np.arange(n_cells, dtype=np.int32)
+            values = cell_tags.astype(np.int32)
+            mesh.topology.create_connectivity(cell_dim, cell_dim)
+            mt = meshtags(mesh, cell_dim, indices, values)
+            mt.name = "cell_tags"
+            with io.XDMFFile(mesh.comm, str(path), "w") as xf:
+                xf.write_mesh(mesh)
+                xf.write_meshtags(mt, mesh.geometry)
+        else:
+            with io.XDMFFile(mesh.comm, str(path), "w") as xf:
+                xf.write_mesh(mesh)
+                
     return mesh
 
 
@@ -404,7 +406,7 @@ def airfoil_solid(
     _write_quad_mesh(path, coords, quads)
 
     # Total area (numerical, by trapezoidal rule on half-thickness)
-    A = 2.0 * np.trapz(half_t, eta * chord)
+    A = 2.0 * np.trapezoid(half_t, eta * chord)
     return path, {"A": A, "chord": chord, "thickness": thickness}
 
 

@@ -19,7 +19,7 @@ from b3_secfem import (
     SectionInput,
     solve,
 )
-from tests._meshlib import (
+from b3_secfem._meshlib import (
     airfoil_hollow,
     airfoil_solid,
     airfoil_with_web,
