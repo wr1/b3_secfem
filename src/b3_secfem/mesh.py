@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    import dolfinx
+    pass
 
 
 def read_xdmf(path: str | Path, comm=None) -> tuple[Any, Any]:

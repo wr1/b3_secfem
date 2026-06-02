@@ -71,16 +71,32 @@ from .spaces import (
 
 log = logging.getLogger(__name__)
 
-STAGE1_MODES = (2, 3, 4, 5)   # Fz, Mx, My, Mz
-STAGE2_MODES = (0, 1)          # Vx, Vy
-ALL_MODES = (0, 1, 2, 3, 4, 5)
+from .backends.common import ALL_MODES, STAGE1_MODES, STAGE2_MODES
+
+# Re-export for existing internal imports (recovery.py etc.)
+__all__ = ["ALL_MODES", "STAGE1_MODES", "STAGE2_MODES"]  # type: ignore[assignment]
 
 
 def solve(inp: SectionInput) -> SectionResult:
-    """Run the cross-section chain solve and return K, M, centres."""
+    """Run the cross-section chain solve and return K, M, centres.
+
+    Dispatches to the backend named in inp.backend (or "fenicsx").
+    The fenicsx implementation lives in this module (as _fenicsx_solve) during
+    the transition; it will move into backends/fenicsx.py later.
+    """
+    from .backends import get_backend
+    from .backends.common import get_backend_name_from_inp
+
+    name = get_backend_name_from_inp(inp)
+    backend = get_backend(name)
+    return backend.solve(inp)
+
+
+def _fenicsx_solve(inp: SectionInput) -> SectionResult:
+    """Run the cross-section chain solve and return K, M, centres. (fenicsx reference)"""
     import ufl
     from dolfinx import fem
-    from dolfinx.fem.petsc import assemble_matrix, assemble_vector
+    from dolfinx.fem.petsc import assemble_matrix
     from petsc4py import PETSc
 
     mesh, cell_tags = _load_mesh(inp)

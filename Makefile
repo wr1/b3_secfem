@@ -24,8 +24,8 @@ MAMBA_RUN ?= micromamba run -n $(MAMBA_ENV)
 help:
 	@echo "b3_secfem developer targets:"
 	@echo ""
-	@echo "  make install      - editable-install b3_mat, airfoilmesh, b3_secfem[dev] into the '$(MAMBA_ENV)' env"
-	@echo "  make test         - install + run the full test suite"
+	@echo "  make install      - editable-install b3_mat, airfoilmesh, b3_secfem[dev] into the '$(MAMBA_ENV)' env (run once)"
+	@echo "  make test         - run the full test suite (requires prior 'make install')"
 	@echo "  make test-pure    - run only the pure-Python tests (no dolfinx needed)"
 	@echo "  make lint         - run ruff linter"
 	@echo "  make format       - run ruff formatter"
@@ -37,7 +37,7 @@ install:
 	@echo "==> Installing local b3_mat + airfoilmesh (siblings) + b3_secfem[dev] into '$(MAMBA_ENV)'"
 	$(MAMBA_RUN) pip install -e ../b3_mat -e ../b3_af -e ".[dev]"
 
-test: install
+test:
 	$(MAMBA_RUN) python -m pytest -q --tb=short
 
 # Pure-Python tests (no dolfinx required) — runnable in any env with the deps.

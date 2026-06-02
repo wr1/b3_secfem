@@ -195,7 +195,6 @@ def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
     eps_b = basis.epsilon
     sig_b = basis.sigma
     areas = basis.cell_areas
-    n_cells = eps_b.shape[1]
 
     Gamma = np.linalg.solve(result.R, np.eye(6))   # column k = inv(R) @ e_k
     eps_out = np.einsum("ki,icv->kcv", Gamma.T, eps_b)

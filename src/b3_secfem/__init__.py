@@ -1,12 +1,16 @@
-"""b3_secfem — composite cross-section property solver (FEniCSx).
+"""b3_secfem — composite cross-section property solver.
 
-Pure-numpy surface (no FEniCSx import required):
+Supports two backends (selected via SectionInput.backend or solve(..., backend=...)):
+- "fenicsx" (default): dolfinx + UFL + PETSc (full featured, the original implementation)
+- "mfem": PyMFEM serial (mfem.ser) — independent numeric engine for cross-validation
+
+Pure-numpy surface (no FEM import required):
     IsotropicMaterial, OrthotropicMaterial, Material
     RegionMat, SectionInput
     rotate_stiffness_6x6
     materials_from_b3_mat
 
-FEniCSx-dependent surface (import on use):
+Backend-dependent surface (import on use; only the chosen backend's deps are required at runtime):
     solve, recover_strains, recover_unit_load_strains,
     SectionResult, StrainField, UnitLoadStrainField
     read_xdmf, write_xdmf, from_gxbeam_vtu
@@ -20,9 +24,20 @@ from .recovery import StrainField, UnitLoadStrainField
 from .rotation3d import rotate_stiffness_6x6
 
 
-def solve(inp):
-    """Run the 6-unit-load Saint-Venant solve. See solver.solve."""
+def solve(inp, backend: str | None = None):
+    """Run the 6-unit-load Saint-Venant solve.
+
+    Parameters
+    ----------
+    inp : SectionInput
+        Input specification (mesh + materials).
+    backend : str or None
+        Override the backend ("fenicsx" or "mfem"). If None, uses inp.backend.
+        The kwarg takes precedence and a copy of inp is made internally if needed.
+    """
     from .solver import solve as _solve
+    if backend is not None:
+        inp = inp.model_copy(update={"backend": backend})
     return _solve(inp)
 
 

@@ -22,7 +22,6 @@ from b3_secfem import (
 from tests._meshlib import (
     airfoil_hollow,
     airfoil_solid,
-    airfoil_with_web,
     hollow_cylinder,
     hollow_ellipse,
     i_beam,
@@ -58,7 +57,7 @@ def test_hollow_cylinder_axial_bending_torsion(tmp_path):
 def test_hollow_cylinder_centres(tmp_path):
     """Symmetric annulus: tension and elastic centres at the origin."""
     iso = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
-    path, info = hollow_cylinder(tmp_path, 0.05, 0.005, 64, 4)
+    path, _info = hollow_cylinder(tmp_path, 0.05, 0.005, 64, 4)
     inp = SectionInput(mesh_path=path, region_materials={1: RegionMat(material=iso)})
     res = solve(inp)
     np.testing.assert_allclose(res.tension_center, (0.0, 0.0), atol=1e-12)
@@ -158,7 +157,7 @@ def test_i_beam_shear_carriers(tmp_path):
     iso = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
     b, h = 0.10, 0.20
     t_f, t_w = 0.012, 0.008
-    path, info = i_beam(tmp_path, b, h, t_w, t_f)
+    path, _info = i_beam(tmp_path, b, h, t_w, t_f)
     inp = SectionInput(mesh_path=path, region_materials={1: RegionMat(material=iso)})
     res = solve(inp)
 

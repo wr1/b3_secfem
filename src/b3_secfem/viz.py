@@ -57,7 +57,7 @@ def plot_section(
         figsize = (sec_w + 4.0, sec_h + 0.6)
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
-    sec_w, fig_h = figsize
+    sec_w = figsize[0]
     gs = GridSpec(
         nrows=1, ncols=2,
         width_ratios=[sec_w - 4.0, 4.0],
@@ -114,7 +114,7 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
 
     tx, ty = res.tension_center
     sx, sy = res.shear_center
-    ex, ey = res.elastic_center
+    ex, _ey = res.elastic_center
     mx, my = getattr(res, "mass_center", ex)  # fallback for any legacy result
 
     if np.isfinite(tx) and np.isfinite(ty):
@@ -143,7 +143,7 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
         mag = eigvals / eigvals.max()
         # Neutral axes pass through the tension/elastic (stiffness) centre
         cx_e, cy_e = (tx, ty) if np.isfinite(tx) else (0.0, 0.0)
-        for k, (lam, vec) in enumerate(zip(eigvals, eigvecs.T)):
+        for k, (lam, vec) in enumerate(zip(eigvals, eigvecs.T, strict=True)):
             ex_dir = np.array([vec[1], -vec[0]])
             ex_dir /= np.linalg.norm(ex_dir)
             half = 0.5 * L * mag[k]
@@ -248,7 +248,7 @@ def plot_warping(
     bbox = _bbox(nodes)
     diag = np.hypot(bbox[1] - bbox[0], bbox[3] - bbox[2])
 
-    disp_nodes, mode_label, include_assumed = _evaluate_mode_at_nodes(
+    disp_nodes, mode_label, _include_assumed = _evaluate_mode_at_nodes(
         res, mode, nodes
     )
     if scale is None:
@@ -274,8 +274,8 @@ def plot_warping(
         edgecolor="0.3", linewidth=0.3,
     )
     ax.add_collection(coll)
-    cbar = fig.colorbar(coll, ax=ax, fraction=0.04, pad=0.02,
-                        label="$u_z$ (out-of-plane warping) [m]")
+    fig.colorbar(coll, ax=ax, fraction=0.04, pad=0.02,
+                 label="$u_z$ (out-of-plane warping) [m]")
 
     ax.set_aspect("equal")
     ax.set_xlabel("x [m]")

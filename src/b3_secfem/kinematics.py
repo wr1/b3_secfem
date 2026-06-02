@@ -31,7 +31,6 @@ def grad3d(u: Any) -> Any:
 
 def epsilon(u: Any) -> Any:
     """3x3 small-strain tensor of u (symmetric part of grad3d)."""
-    import ufl
 
     G = grad3d(u)
     return 0.5 * (G + G.T)

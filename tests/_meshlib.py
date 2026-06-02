@@ -310,6 +310,12 @@ def airfoil_hollow(
     The mesh is written to ``tmp_path / "airfoil_hollow.xdmf"`` with
     integer cell tags = (region_id from materials list).
     """
+    # airfoilmesh is the sibling ``b3_af`` package (not on PyPI). It is only
+    # available where ``../b3_af`` was editable-installed (see Makefile). On a
+    # remote/CI runner it is absent, so skip rather than error.
+    import pytest
+
+    pytest.importorskip("airfoilmesh")
     from airfoilmesh import Layer, Material, afmesh, naca4
 
     ply_glass = Material("glass_ud")
@@ -403,8 +409,11 @@ def airfoil_solid(
     path = tmp_path / "airfoil.xdmf"
     _write_quad_mesh(path, coords, quads)
 
-    # Total area (numerical, by trapezoidal rule on half-thickness)
-    A = 2.0 * np.trapezoid(half_t, eta * chord)
+    # Total area (numerical, by trapezoidal rule on half-thickness).
+    # np.trapezoid is numpy>=2.0; fall back to np.trapz on numpy 1.x (the
+    # version dolfinx's apt build is ABI-locked to).
+    _trapezoid = getattr(np, "trapezoid", getattr(np, "trapz", None))
+    A = 2.0 * _trapezoid(half_t, eta * chord)
     return path, {"A": A, "chord": chord, "thickness": thickness}
 
 
