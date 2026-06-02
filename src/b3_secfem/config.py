@@ -43,10 +43,13 @@ class SectionInput(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    mesh_path: Path = Field(..., description="XDMF mesh file (or VTU via mesh.from_gxbeam_vtu)")
+    mesh_path: Path = Field(
+        ..., description="XDMF mesh file (or VTU via mesh.from_gxbeam_vtu)"
+    )
     degree: int = Field(2, ge=1, le=3, description="CG polynomial degree")
     backend: Literal["fenicsx", "mfem"] = Field(
-        "fenicsx", description="FEM backend: 'fenicsx' (default, requires dolfinx) or 'mfem' (PyMFEM)"
+        "fenicsx",
+        description="FEM backend: 'fenicsx' (default, requires dolfinx) or 'mfem' (PyMFEM)",
     )
 
     region_materials: dict[int, RegionMat] | None = None

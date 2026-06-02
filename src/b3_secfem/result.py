@@ -61,11 +61,13 @@ class SectionResult(BaseModel):
     @property
     def K_gxbeam_order(self) -> np.ndarray:
         from .post import to_gxbeam_order
+
         return to_gxbeam_order(self.K)
 
     @property
     def K_anba_order(self) -> np.ndarray:
         from .post import to_anba_order
+
         return to_anba_order(self.K)
 
     def __repr__(self) -> str:  # pragma: no cover

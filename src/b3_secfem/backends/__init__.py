@@ -22,10 +22,12 @@ def get_backend(name: str):
 
     if name == "fenicsx":
         from . import fenicsx as mod  # type: ignore
+
         register_backend(name, mod)
         return mod
     if name == "mfem":
         from . import mfem as mod  # type: ignore
+
         register_backend(name, mod)
         return mod
 

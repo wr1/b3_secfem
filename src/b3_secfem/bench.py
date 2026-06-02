@@ -38,9 +38,16 @@ MATERIALS: dict[str, dict] = {
     "iso": {"kind": "iso", "E": 100e9, "nu": 0.3, "rho": 2000.0},
     "ortho": {
         "kind": "ortho",
-        "E1": 140e9, "E2": 10e9, "E3": 10e9,
-        "G12": 5e9, "G13": 5e9, "G23": 3.5e9,
-        "nu12": 0.3, "nu13": 0.3, "nu23": 0.4, "rho": 1600.0,
+        "E1": 140e9,
+        "E2": 10e9,
+        "E3": 10e9,
+        "G12": 5e9,
+        "G13": 5e9,
+        "G23": 3.5e9,
+        "nu12": 0.3,
+        "nu13": 0.3,
+        "nu23": 0.4,
+        "rho": 1600.0,
     },
 }
 
@@ -49,7 +56,7 @@ MATERIALS: dict[str, dict] = {
 # Worker: assemble E with one backend, in a fresh process, dump to .npz
 # ---------------------------------------------------------------------------
 
-_WORKER = r'''
+_WORKER = r"""
 import json, sys, time
 import numpy as np
 import scipy.sparse as sp
@@ -100,7 +107,7 @@ print(json.dumps({
     "assemble_s": t1 - t0,
     "trace": float(A.diagonal().sum()),
 }))
-'''
+"""
 
 
 def assemble_in_subprocess(
@@ -114,7 +121,8 @@ def assemble_in_subprocess(
     """
     proc = subprocess.run(
         [sys.executable, "-c", _WORKER, backend, str(mesh_path), mat_key, str(out_npz)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -129,7 +137,7 @@ def assemble_in_subprocess(
 # Full solve: run a complete solve() per backend in a subprocess, compare K/M
 # ---------------------------------------------------------------------------
 
-_FULL_WORKER = r'''
+_FULL_WORKER = r"""
 import json, sys, time
 import numpy as np
 
@@ -163,14 +171,15 @@ print(json.dumps({
     "mass_center": list(res.mass_center),
     "shear_center": list(res.shear_center),
 }))
-'''
+"""
 
 
 def full_solve_in_subprocess(backend: str, mesh_path: str | Path, mat_key: str) -> dict:
     """Run a complete ``solve()`` for one backend in an isolated subprocess."""
     proc = subprocess.run(
         [sys.executable, "-c", _FULL_WORKER, mat_key, str(mesh_path), backend],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -207,7 +216,9 @@ def run_full_comparison(mat_key: str = "iso", nx: int = 12, ny: int = 8) -> dict
         "K_section_xy_rel": abs(fen["K_section_xy"] - mf["K_section_xy"])
         / max(abs(fen["K_section_xy"]), 1e-300),
         "tension_center_absdiff": float(
-            np.abs(np.array(fen["tension_center"]) - np.array(mf["tension_center"])).max()
+            np.abs(
+                np.array(fen["tension_center"]) - np.array(mf["tension_center"])
+            ).max()
         ),
         "shear_center_absdiff": float(
             np.abs(np.array(fen["shear_center"]) - np.array(mf["shear_center"])).max()
@@ -220,6 +231,7 @@ def run_full_comparison(mat_key: str = "iso", nx: int = 12, ny: int = 8) -> dict
 # Mesh generation (dolfinx, written to XDMF both backends can read)
 # ---------------------------------------------------------------------------
 
+
 def make_rectangle_xdmf(path: str | Path, a=0.2, b=0.1, nx=16, ny=10) -> None:
     """Write a structured quad rectangle to XDMF (consumed by both backends)."""
     from dolfinx import mesh as dmesh
@@ -228,7 +240,9 @@ def make_rectangle_xdmf(path: str | Path, a=0.2, b=0.1, nx=16, ny=10) -> None:
     from b3_secfem import write_xdmf
 
     m = dmesh.create_rectangle(
-        MPI.COMM_WORLD, [(-a / 2, -b / 2), (a / 2, b / 2)], [nx, ny],
+        MPI.COMM_WORLD,
+        [(-a / 2, -b / 2), (a / 2, b / 2)],
+        [nx, ny],
         cell_type=dmesh.CellType.quadrilateral,
     )
     write_xdmf(path, m)
@@ -237,6 +251,7 @@ def make_rectangle_xdmf(path: str | Path, a=0.2, b=0.1, nx=16, ny=10) -> None:
 # ---------------------------------------------------------------------------
 # Permutation-invariant comparison metrics
 # ---------------------------------------------------------------------------
+
 
 def compare_operators(npz_a: str | Path, npz_b: str | Path) -> dict:
     """Compare two assembled E operators via permutation-invariant metrics."""
@@ -285,6 +300,7 @@ def run_comparison(mat_key: str = "iso", nx: int = 16, ny: int = 10) -> dict:
 # Timing analysis
 # ---------------------------------------------------------------------------
 
+
 def time_backends(
     sizes: list[tuple[int, int]] | None = None,
     mat_key: str = "iso",
@@ -308,7 +324,7 @@ def time_backends(
             mesh_xdmf = tmp / f"mesh_{nx}x{ny}.xdmf"
             make_rectangle_xdmf(mesh_xdmf, nx=nx, ny=ny)
             times: dict[str, float] = {}
-            ncells = ndof = nnz = 0
+            ncells = ndof = 0
             for be in ("fenicsx", "mfem"):
                 best = float("inf")
                 for _ in range(repeats):
@@ -316,13 +332,19 @@ def time_backends(
                         be, mesh_xdmf, mat_key, tmp / f"{be}.npz"
                     )
                     best = min(best, meta["assemble_s"])
-                    ncells, ndof, nnz = meta["n_cells"], meta["shape"][0], meta["nnz"]
+                    ncells, ndof = meta["n_cells"], meta["shape"][0]
                 times[be] = best
-            rows.append({
-                "nx": nx, "ny": ny, "n_cells": ncells, "ndof": ndof,
-                "fenicsx_s": times["fenicsx"], "mfem_s": times["mfem"],
-                "ratio_mfem_over_fenicsx": times["mfem"] / times["fenicsx"],
-            })
+            rows.append(
+                {
+                    "nx": nx,
+                    "ny": ny,
+                    "n_cells": ncells,
+                    "ndof": ndof,
+                    "fenicsx_s": times["fenicsx"],
+                    "mfem_s": times["mfem"],
+                    "ratio_mfem_over_fenicsx": times["mfem"] / times["fenicsx"],
+                }
+            )
     return rows
 
 

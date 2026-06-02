@@ -59,9 +59,11 @@ def plot_section(
     fig = plt.figure(figsize=figsize, dpi=dpi)
     sec_w = figsize[0]
     gs = GridSpec(
-        nrows=1, ncols=2,
+        nrows=1,
+        ncols=2,
         width_ratios=[sec_w - 4.0, 4.0],
-        wspace=0.25, figure=fig,
+        wspace=0.25,
+        figure=fig,
     )
     ax = fig.add_subplot(gs[0, 0])
     ax_legend = fig.add_subplot(gs[0, 1])
@@ -81,7 +83,10 @@ def plot_section(
         cbar.set_ticks(np.unique(region_tags).astype(float))
     else:
         coll = PolyCollection(
-            poly_xy, facecolor="0.85", edgecolor="0.4", linewidth=0.3,
+            poly_xy,
+            facecolor="0.85",
+            edgecolor="0.4",
+            linewidth=0.3,
         )
     ax.add_collection(coll)
 
@@ -95,8 +100,11 @@ def plot_section(
     ax.autoscale_view()
 
     ax_legend.legend(
-        handles, labels,
-        loc="upper left", fontsize=8, framealpha=0.95,
+        handles,
+        labels,
+        loc="upper left",
+        fontsize=8,
+        framealpha=0.95,
         bbox_to_anchor=(0.0, 1.0),
     )
 
@@ -118,18 +126,21 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
     mx, my = getattr(res, "mass_center", ex)  # fallback for any legacy result
 
     if np.isfinite(tx) and np.isfinite(ty):
-        h, = ax.plot([tx], [ty], "o", color="#cc0000", markersize=8,
-                     markeredgecolor="white")
+        (h,) = ax.plot(
+            [tx], [ty], "o", color="#cc0000", markersize=8, markeredgecolor="white"
+        )
         handles.append(h)
         labels.append(f"elastic/tension ({tx:+.2e}, {ty:+.2e})")
     if np.isfinite(mx) and np.isfinite(my):
-        h, = ax.plot([mx], [my], "v", color="#dd6600", markersize=8,
-                     markeredgecolor="white")
+        (h,) = ax.plot(
+            [mx], [my], "v", color="#dd6600", markersize=8, markeredgecolor="white"
+        )
         handles.append(h)
         labels.append(f"mass ({mx:+.2e}, {my:+.2e})")
     if np.isfinite(sx) and np.isfinite(sy):
-        h, = ax.plot([sx], [sy], "D", color="#117733", markersize=8,
-                     markeredgecolor="white")
+        (h,) = ax.plot(
+            [sx], [sy], "D", color="#117733", markersize=8, markeredgecolor="white"
+        )
         handles.append(h)
         labels.append(f"shear ({sx:+.2e}, {sy:+.2e})")
 
@@ -151,7 +162,7 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
             x1, y1 = cx_e + half * ex_dir[0], cy_e + half * ex_dir[1]
             color = "#222222" if k == 0 else "#666666"
             lw = 2.0 if k == 0 else 1.4
-            h, = ax.plot([x0, x1], [y0, y1], color=color, linewidth=lw)
+            (h,) = ax.plot([x0, x1], [y0, y1], color=color, linewidth=lw)
             handles.append(h)
             labels.append(f"neutral axis {k + 1}\n  EI = {lam:.2e}")
     return handles, labels
@@ -248,9 +259,7 @@ def plot_warping(
     bbox = _bbox(nodes)
     diag = np.hypot(bbox[1] - bbox[0], bbox[3] - bbox[2])
 
-    disp_nodes, mode_label, _include_assumed = _evaluate_mode_at_nodes(
-        res, mode, nodes
-    )
+    disp_nodes, mode_label, _include_assumed = _evaluate_mode_at_nodes(res, mode, nodes)
     if scale is None:
         peak_inplane = float(np.max(np.linalg.norm(disp_nodes[:, :2], axis=1)))
         if peak_inplane > 1e-30:
@@ -263,19 +272,28 @@ def plot_warping(
 
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
     poly_orig = nodes[quads]
-    ax.add_collection(PolyCollection(
-        poly_orig, facecolor="none", edgecolor="0.7", linewidth=0.4,
-    ))
+    ax.add_collection(
+        PolyCollection(
+            poly_orig,
+            facecolor="none",
+            edgecolor="0.7",
+            linewidth=0.4,
+        )
+    )
 
     poly_def = deformed[quads]
     cell_uz = u_z[quads].mean(axis=1)
     coll = PolyCollection(
-        poly_def, array=cell_uz, cmap="coolwarm",
-        edgecolor="0.3", linewidth=0.3,
+        poly_def,
+        array=cell_uz,
+        cmap="coolwarm",
+        edgecolor="0.3",
+        linewidth=0.3,
     )
     ax.add_collection(coll)
-    fig.colorbar(coll, ax=ax, fraction=0.04, pad=0.02,
-                 label="$u_z$ (out-of-plane warping) [m]")
+    fig.colorbar(
+        coll, ax=ax, fraction=0.04, pad=0.02, label="$u_z$ (out-of-plane warping) [m]"
+    )
 
     ax.set_aspect("equal")
     ax.set_xlabel("x [m]")
@@ -312,7 +330,9 @@ def _evaluate_mode_at_nodes(
         ``(0.5 y, 0.5 x, 0)`` so the section visibly shears.
     """
     from dolfinx.geometry import (
-        bb_tree, compute_colliding_cells, compute_collisions_points,
+        bb_tree,
+        compute_colliding_cells,
+        compute_collisions_points,
     )
 
     mesh = res.mesh
@@ -346,13 +366,13 @@ def _evaluate_mode_at_nodes(
 
     warp = res.u_solutions[mode].eval(points_3d, cells_per_pt)
     d0 = np.zeros_like(warp)
-    if mode == 2:           # axial
+    if mode == 2:  # axial
         d0[:, 2] = 1.0
-    elif mode == 3:         # M_x bending
+    elif mode == 3:  # M_x bending
         d0[:, 2] = -nodes[:, 1]
-    elif mode == 4:         # M_y bending
+    elif mode == 4:  # M_y bending
         d0[:, 2] = nodes[:, 0]
-    elif mode == 5:         # M_z torsion
+    elif mode == 5:  # M_z torsion
         d0[:, 0] = -nodes[:, 1]
         d0[:, 1] = nodes[:, 0]
     # Stage-2 shear modes get no kinematic at z = 0; warp is already d_2.

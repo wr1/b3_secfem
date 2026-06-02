@@ -68,10 +68,9 @@ from .spaces import (
     make_displacement_space,
     make_stiffness_space,
 )
+from .backends.common import ALL_MODES, STAGE1_MODES, STAGE2_MODES
 
 log = logging.getLogger(__name__)
-
-from .backends.common import ALL_MODES, STAGE1_MODES, STAGE2_MODES
 
 # Re-export for existing internal imports (recovery.py etc.)
 __all__ = ["ALL_MODES", "STAGE1_MODES", "STAGE2_MODES"]  # type: ignore[assignment]
@@ -156,16 +155,20 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     # Stage 1: solve d_1 for axial / bending / twist.
     for i in STAGE1_MODES:
         rhs = chain_rhs_stage1(C_func, v, d0_fields[i])
-        d1_fields[i] = _solve_with_nullspace(V, ksp, fem.form(rhs), nullspace, name=f"d1_{i}")
+        d1_fields[i] = _solve_with_nullspace(
+            V, ksp, fem.form(rhs), nullspace, name=f"d1_{i}"
+        )
 
     # Shear chains share d_1 with the corresponding bending chain
-    d1_fields[0] = d1_fields[4]   # Vx chain uses M_y bending warping
-    d1_fields[1] = d1_fields[3]   # Vy chain uses M_x bending warping
+    d1_fields[0] = d1_fields[4]  # Vx chain uses M_y bending warping
+    d1_fields[1] = d1_fields[3]  # Vy chain uses M_x bending warping
 
     # Stage 2: solve d_2 for transverse shear.
     for i in STAGE2_MODES:
         rhs = chain_rhs_stage2(C_func, v, d0_fields[i], d1_fields[i])
-        d2_fields[i] = _solve_with_nullspace(V, ksp, fem.form(rhs), nullspace, name=f"d2_{i}")
+        d2_fields[i] = _solve_with_nullspace(
+            V, ksp, fem.form(rhs), nullspace, name=f"d2_{i}"
+        )
 
     # 7th cell problem: section-averaged in-plane shear stiffness.
     # NOT a beam-level DOF -- computed and returned separately.
@@ -183,9 +186,9 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     )
     A_total = float(fem.assemble_scalar(fem.form(fem.Constant(mesh, 1.0) * ufl.dx)))
     gamma_xy_raw = voigt_strain(w_xy_raw)[5]
-    mean_gamma_xy_raw = float(
-        fem.assemble_scalar(fem.form(gamma_xy_raw * ufl.dx))
-    ) / A_total
+    mean_gamma_xy_raw = (
+        float(fem.assemble_scalar(fem.form(gamma_xy_raw * ufl.dx))) / A_total
+    )
     # phi_field = (y, x, 0) gives gamma_xy = 2 uniformly; subtract beta*phi
     # so that mean(gamma_xy(w_xy_raw - beta*phi)) = 0.
     beta = mean_gamma_xy_raw / 2.0
@@ -194,8 +197,8 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     coords = V.tabulate_dof_coordinates()
     bs = V.dofmap.index_map_bs
     arr = w_xy.x.array.reshape(-1, bs)
-    arr[:, 0] -= beta * coords[:, 1]   # subtract beta * y from u_x
-    arr[:, 1] -= beta * coords[:, 0]   # subtract beta * x from u_y
+    arr[:, 0] -= beta * coords[:, 1]  # subtract beta * y from u_x
+    arr[:, 1] -= beta * coords[:, 0]  # subtract beta * x from u_y
     w_xy.x.scatter_forward()
 
     eps_xy_total = assumed_inplane_shear_voigt() + voigt_strain(w_xy)
@@ -246,7 +249,9 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     )
 
 
-def _solve_with_nullspace(V: Any, ksp: Any, L_form: Any, nullspace: Any, name: str) -> Any:
+def _solve_with_nullspace(
+    V: Any, ksp: Any, L_form: Any, nullspace: Any, name: str
+) -> Any:
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_vector
     from petsc4py import PETSc
@@ -285,12 +290,12 @@ def _assemble_resultants(
     for i in range(6):
         sigma = ufl.dot(C_func, eps_totals[i])
         forms = [
-            sigma[4],                                  # Vx
-            sigma[3],                                  # Vy
-            sigma[2],                                  # Fz
-            x[1] * sigma[2],                           # Mx
-            -x[0] * sigma[2],                          # My
-            x[0] * sigma[3] - x[1] * sigma[4],         # Mz
+            sigma[4],  # Vx
+            sigma[3],  # Vy
+            sigma[2],  # Fz
+            x[1] * sigma[2],  # Mx
+            -x[0] * sigma[2],  # My
+            x[0] * sigma[3] - x[1] * sigma[4],  # Mz
         ]
         for a, integrand in enumerate(forms):
             R[a, i] = float(fem.assemble_scalar(fem.form(integrand * ufl.dx)))
@@ -317,6 +322,7 @@ def _load_mesh(inp: SectionInput):
         return read_xdmf(path)
     if suffix == ".vtu":
         from .mesh import from_gxbeam_vtu
+
         info = from_gxbeam_vtu(path)
         return info["mesh"], None
     msg = f"unsupported mesh extension {suffix}; use .xdmf or .vtu"

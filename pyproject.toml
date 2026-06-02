@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff", "matplotlib"]
+dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit"]
 # airfoilmesh is the sibling ``b3_af`` package (not published to PyPI). The
 # airfoil-section tests skip when it is absent, so it is opt-in: install with
 # ``pip install -e ../b3_af`` (see Makefile) to exercise them locally.
@@ -64,3 +64,5 @@ target-version = "py311"
 "tests/*" = ["E402"]
 # 'I' is the conventional symbol for the second moment of area; keep it.
 "tests/_meshlib.py" = ["E402", "E741"]
+# 'I'/'J'/'D' are the conventional CSR row-pointer / column / data arrays.
+"src/b3_secfem/backends/mfem.py" = ["E741"]

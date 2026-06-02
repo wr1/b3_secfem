@@ -98,10 +98,14 @@ def from_gxbeam_vtu(path: str | Path) -> dict[str, Any]:
     # Validate CCW winding (signed shoelace area > 0); flip non-CCW quads.
     p = nodes[quads]
     sa = (
-        p[:, 0, 0] * p[:, 1, 1] - p[:, 1, 0] * p[:, 0, 1]
-        + p[:, 1, 0] * p[:, 2, 1] - p[:, 2, 0] * p[:, 1, 1]
-        + p[:, 2, 0] * p[:, 3, 1] - p[:, 3, 0] * p[:, 2, 1]
-        + p[:, 3, 0] * p[:, 0, 1] - p[:, 0, 0] * p[:, 3, 1]
+        p[:, 0, 0] * p[:, 1, 1]
+        - p[:, 1, 0] * p[:, 0, 1]
+        + p[:, 1, 0] * p[:, 2, 1]
+        - p[:, 2, 0] * p[:, 1, 1]
+        + p[:, 2, 0] * p[:, 3, 1]
+        - p[:, 3, 0] * p[:, 2, 1]
+        + p[:, 3, 0] * p[:, 0, 1]
+        - p[:, 0, 0] * p[:, 3, 1]
     )
     flip = sa < 0
     if flip.any():

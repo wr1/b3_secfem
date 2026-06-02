@@ -37,6 +37,7 @@ try:
     import mfem.ser as mfem
     import scipy.sparse as sp
     import scipy.sparse.linalg as spla
+
     _MFEM_AVAILABLE = True
 except ImportError:
     _MFEM_AVAILABLE = False
@@ -54,6 +55,7 @@ def _require_mfem():
 # ---------------------------------------------------------------------------
 # Mesh construction (neutral from meshio + mfem.Mesh)
 # ---------------------------------------------------------------------------
+
 
 def _load_mfem_mesh(inp: SectionInput) -> tuple[Any, np.ndarray | None, int]:
     """Load mesh via meshio and build an mfem.Mesh preserving input cell order.
@@ -90,10 +92,14 @@ def _load_mfem_mesh(inp: SectionInput) -> tuple[Any, np.ndarray | None, int]:
     p = nodes[cells]
     if ctype == "quad":
         sa = (
-            p[:, 0, 0] * p[:, 1, 1] - p[:, 1, 0] * p[:, 0, 1]
-            + p[:, 1, 0] * p[:, 2, 1] - p[:, 2, 0] * p[:, 1, 1]
-            + p[:, 2, 0] * p[:, 3, 1] - p[:, 3, 0] * p[:, 2, 1]
-            + p[:, 3, 0] * p[:, 0, 1] - p[:, 0, 0] * p[:, 3, 1]
+            p[:, 0, 0] * p[:, 1, 1]
+            - p[:, 1, 0] * p[:, 0, 1]
+            + p[:, 1, 0] * p[:, 2, 1]
+            - p[:, 2, 0] * p[:, 1, 1]
+            + p[:, 2, 0] * p[:, 3, 1]
+            - p[:, 3, 0] * p[:, 2, 1]
+            + p[:, 3, 0] * p[:, 0, 1]
+            - p[:, 0, 0] * p[:, 3, 1]
         )
         flip = sa < 0
         if flip.any():
@@ -103,9 +109,12 @@ def _load_mfem_mesh(inp: SectionInput) -> tuple[Any, np.ndarray | None, int]:
     else:
         # tri shoelace (simpler)
         sa = (
-            p[:, 0, 0] * p[:, 1, 1] - p[:, 1, 0] * p[:, 0, 1]
-            + p[:, 1, 0] * p[:, 2, 1] - p[:, 2, 0] * p[:, 1, 1]
-            + p[:, 2, 0] * p[:, 0, 1] - p[:, 0, 0] * p[:, 2, 1]
+            p[:, 0, 0] * p[:, 1, 1]
+            - p[:, 1, 0] * p[:, 0, 1]
+            + p[:, 1, 0] * p[:, 2, 1]
+            - p[:, 2, 0] * p[:, 1, 1]
+            + p[:, 2, 0] * p[:, 0, 1]
+            - p[:, 0, 0] * p[:, 2, 1]
         )
         flip = sa < 0
         if flip.any():
@@ -121,10 +130,12 @@ def _load_mfem_mesh(inp: SectionInput) -> tuple[Any, np.ndarray | None, int]:
 
     if ctype == "quad":
         for i in range(ne):
-            mesh.AddQuad(int(cells[i,0]), int(cells[i,1]), int(cells[i,2]), int(cells[i,3]))
+            mesh.AddQuad(
+                int(cells[i, 0]), int(cells[i, 1]), int(cells[i, 2]), int(cells[i, 3])
+            )
     else:
         for i in range(ne):
-            mesh.AddTriangle(int(cells[i,0]), int(cells[i,1]), int(cells[i,2]))
+            mesh.AddTriangle(int(cells[i, 0]), int(cells[i, 1]), int(cells[i, 2]))
 
     mesh.FinalizeTopology()
     mesh.Finalize()
@@ -167,12 +178,12 @@ def _voigt_strain_from_dshape(dshape_np: np.ndarray) -> np.ndarray:
     B = np.zeros((6, 3 * ndof))
     ux, uy, uz = 0, ndof, 2 * ndof
     for k in range(ndof):
-        B[0, ux + k] = dshape_np[k, 0]   # e_xx   from ux,x
-        B[5, ux + k] = dshape_np[k, 1]   # 2 e_xy from ux,y
-        B[1, uy + k] = dshape_np[k, 1]   # e_yy   from uy,y
-        B[5, uy + k] = dshape_np[k, 0]   # 2 e_xy from uy,x
-        B[3, uz + k] = dshape_np[k, 1]   # 2 e_yz from uz,y
-        B[4, uz + k] = dshape_np[k, 0]   # 2 e_xz from uz,x
+        B[0, ux + k] = dshape_np[k, 0]  # e_xx   from ux,x
+        B[5, ux + k] = dshape_np[k, 1]  # 2 e_xy from ux,y
+        B[1, uy + k] = dshape_np[k, 1]  # e_yy   from uy,y
+        B[5, uy + k] = dshape_np[k, 0]  # 2 e_xy from uy,x
+        B[3, uz + k] = dshape_np[k, 1]  # 2 e_yz from uz,y
+        B[4, uz + k] = dshape_np[k, 0]  # 2 e_xz from uz,x
     return B
 
 
@@ -190,9 +201,9 @@ def _voigt_epsz_from_shape(shape_np: np.ndarray) -> np.ndarray:
     Bz = np.zeros((6, 3 * ndof))
     ux, uy, uz = 0, ndof, 2 * ndof
     for k in range(ndof):
-        Bz[2, uz + k] = shape_np[k]   # eps_zz   = v_z
-        Bz[3, uy + k] = shape_np[k]   # 2 eps_yz = v_y
-        Bz[4, ux + k] = shape_np[k]   # 2 eps_xz = v_x
+        Bz[2, uz + k] = shape_np[k]  # eps_zz   = v_z
+        Bz[3, uy + k] = shape_np[k]  # 2 eps_yz = v_y
+        Bz[4, ux + k] = shape_np[k]  # 2 eps_xz = v_x
     return Bz
 
 
@@ -201,12 +212,14 @@ def _voigt_epsz_from_shape(shape_np: np.ndarray) -> np.ndarray:
 # These are only defined when mfem is actually importable.
 # ---------------------------------------------------------------------------
 
+
 def _quad_order(el) -> int:
     """Integration-rule order used consistently across every mfem-backend form."""
     return 2 * el.GetOrder() + 3
 
 
 if _MFEM_AVAILABLE:
+
     class _VoigtFormIntegrator(mfem.PyBilinearFormIntegrator):
         """Generic ∫ B_test(v)^T C(x) B_trial(u) dA over the section.
 
@@ -233,7 +246,9 @@ if _MFEM_AVAILABLE:
             if kind == "xy":
                 el.CalcDShape(ip, dref)
                 mfem.Mult(dref, trans.InverseJacobian(), dphys)
-                return _voigt_strain_from_dshape(dphys.GetDataArray().reshape(el.GetDof(), 2))
+                return _voigt_strain_from_dshape(
+                    dphys.GetDataArray().reshape(el.GetDof(), 2)
+                )
             el.CalcShape(ip, shp)
             return _voigt_epsz_from_shape(shp.GetDataArray())
 
@@ -285,6 +300,7 @@ else:
 # High-level solve (orchestration re-uses the pure-Python parts of the formulation)
 # ---------------------------------------------------------------------------
 
+
 def solve(inp: SectionInput) -> SectionResult:
     """MFEM backend: full Morandini two-stage chain solve (K, M, centres).
 
@@ -319,7 +335,8 @@ def solve(inp: SectionInput) -> SectionResult:
     # _load_mfem_mesh preserves it -- no dolfinx-style renumbering needed).
     ct = (
         SimpleNamespace(indices=np.arange(n_cells), values=tags)
-        if tags is not None else None
+        if tags is not None
+        else None
     )
     C_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, ct)
 
@@ -342,8 +359,8 @@ def solve(inp: SectionInput) -> SectionResult:
     d1: dict[int, np.ndarray] = {}
     for i in STAGE1_MODES:
         d1[i] = ksolve(-(Cmat @ d0[i]))
-    d1[0] = d1[4]   # Vx chain reuses My bending warping
-    d1[1] = d1[3]   # Vy chain reuses Mx bending warping
+    d1[0] = d1[4]  # Vx chain reuses My bending warping
+    d1[1] = d1[3]  # Vy chain reuses Mx bending warping
 
     # Stage 2: E d2 = Mmat d0 - (Cmat - Cmatᵀ) d1.
     d2: dict[int, np.ndarray] = {}
@@ -360,9 +377,7 @@ def solve(inp: SectionInput) -> SectionResult:
 
     mom = _section_integrals(mesh, fes, C_per_cell, rho_per_cell)
     M = _build_mass(mom)
-    K_section_xy, w_xy = _inplane_shear(
-        mesh, fes, C_per_cell, ksolve, xs, ys, mom["A"]
-    )
+    K_section_xy, w_xy = _inplane_shear(mesh, fes, C_per_cell, ksolve, xs, ys, mom["A"])
 
     detK = np.linalg.det(K)
     S_comp = np.linalg.inv(K) if abs(detK) > 1e-30 else np.full((6, 6), np.nan)
@@ -439,9 +454,9 @@ def assemble_stiffness_matrix(
 # Internal helper functions for the mfem backend
 # =============================================================================
 
+
 def _mfem_spmat_to_scipy(spmat) -> "sp.csr_matrix":
     """Convert mfem SparseMatrix to scipy CSR (robust to Array wrappers)."""
-    import mfem.ser as mfem
     # Get raw arrays - they may come back as mfem.Array
     I = spmat.GetIArray() if hasattr(spmat, "GetIArray") else spmat.GetI()
     J = spmat.GetJArray() if hasattr(spmat, "GetJArray") else spmat.GetJ()
@@ -474,6 +489,7 @@ def _mfem_spmat_to_scipy(spmat) -> "sp.csr_matrix":
 # =============================================================================
 # Full chain solve -- helper functions (mfem engine, validated vs fenicsx)
 # =============================================================================
+
 
 def _d0_field(mode: int):
     """Analytic rigid kinematic d0(x, y) -> (ux, uy, uz) for each chain mode.
@@ -611,10 +627,12 @@ def _iter_quad(mesh, fes, e):
         pt = tr.Transform(ip)
         yield (
             tr.Weight() * ip.weight,
-            pt[0], pt[1],
+            pt[0],
+            pt[1],
             dphys.GetDataArray().reshape(nd, 2).copy(),
             shp.GetDataArray().copy(),
-            idx, sign,
+            idx,
+            sign,
         )
 
 
@@ -637,7 +655,7 @@ def _assemble_R_S(mesh, fes, C_per_cell, a_dofs, b_dofs):
             eps = np.empty((6, 6))
             for i in range(6):
                 eps[:, i] = Bz @ (sign * a_loc[i][idx]) + Bxy @ (sign * b_loc[i][idx])
-            sig = C_local @ eps                 # (voigt, mode)
+            sig = C_local @ eps  # (voigt, mode)
             S += (eps.T @ sig) * w
             for i in range(6):
                 si = sig[:, i]
@@ -675,14 +693,17 @@ def _build_mass(mom: dict) -> np.ndarray:
     """6x6 mass matrix from section moments (matches inertia.assemble_mass)."""
     m, mx, my = mom["m"], mom["mx"], mom["my"]
     Ixx, Iyy, Ixy = mom["Ixx"], mom["Iyy"], mom["Ixy"]
-    M = np.array([
-        [ m,    0,    0,    0,     0,    -my],
-        [ 0,    m,    0,    0,     0,     mx],
-        [ 0,    0,    m,    my,   -mx,    0],
-        [ 0,    0,    my,   Ixx,  -Ixy,   0],
-        [ 0,    0,   -mx,  -Ixy,   Iyy,   0],
-        [-my,   mx,   0,    0,     0,     Ixx + Iyy],
-    ], dtype=float)
+    M = np.array(
+        [
+            [m, 0, 0, 0, 0, -my],
+            [0, m, 0, 0, 0, mx],
+            [0, 0, m, my, -mx, 0],
+            [0, 0, my, Ixx, -Ixy, 0],
+            [0, 0, -mx, -Ixy, Iyy, 0],
+            [-my, mx, 0, 0, 0, Ixx + Iyy],
+        ],
+        dtype=float,
+    )
     return 0.5 * (M + M.T)
 
 

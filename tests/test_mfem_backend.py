@@ -31,6 +31,7 @@ from b3_secfem.backends.common import ALL_MODES, STAGE1_MODES, STAGE2_MODES
 # Always-on tests (no FEM backend required)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_backend_constants_are_consistent():
     """The mode tuples exported for internal use are correct and non-empty."""
     assert set(ALL_MODES) == {0, 1, 2, 3, 4, 5}
@@ -107,8 +108,9 @@ def test_solve_explicit_backend_fenicsx_kwarg(tmp_path):
 # MFEM-specific tests (gated)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_mfem_backend_is_registered_when_mfem_present():
-    mfem = pytest.importorskip("mfem")
+    pytest.importorskip("mfem")
     be = get_backend("mfem")
     assert be is not None
     assert hasattr(be, "solve")
@@ -130,7 +132,9 @@ def test_mfem_backend_full_solve_runs(tmp_path):
     from b3_secfem import write_xdmf
 
     m = dmesh.create_rectangle(
-        MPI.COMM_WORLD, [(-0.05, -0.05), (0.05, 0.05)], [4, 4],
+        MPI.COMM_WORLD,
+        [(-0.05, -0.05), (0.05, 0.05)],
+        [4, 4],
         cell_type=dmesh.CellType.quadrilateral,
     )
     p = tmp_path / "tiny.xdmf"

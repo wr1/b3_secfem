@@ -37,7 +37,7 @@ from tests._meshlib import (
 def test_hollow_cylinder_axial_bending_torsion(tmp_path):
     """Thin annular ring: K[Fz, Fz] = E A; K[M*, M*] = E I; K[Mz, Mz] = G J."""
     iso = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
-    R, t = 0.05, 0.005       # mean radius 50 mm, wall 5 mm
+    R, t = 0.05, 0.005  # mean radius 50 mm, wall 5 mm
     path, info = hollow_cylinder(tmp_path, R, t, n_circ=64, n_rad=4)
 
     inp = SectionInput(mesh_path=path, region_materials={1: RegionMat(material=iso)})
@@ -137,7 +137,7 @@ def test_hollow_ellipse_axial_and_bending(tmp_path):
 def test_i_beam_axial_and_bending(tmp_path):
     """I-beam K[Fz, Fz] = E A and K[Mx, Mx] = E I_xx within mesh tolerance."""
     iso = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
-    b, h = 0.10, 0.20            # 100 x 200 mm
+    b, h = 0.10, 0.20  # 100 x 200 mm
     t_f, t_w = 0.012, 0.008
     path, info = i_beam(tmp_path, b, h, t_w, t_f)
     inp = SectionInput(mesh_path=path, region_materials={1: RegionMat(material=iso)})
@@ -182,18 +182,32 @@ def test_i_beam_shear_carriers(tmp_path):
 
 def _glass_ud():
     return OrthotropicMaterial(
-        E1=45e9, E2=12e9, E3=12e9,
-        G12=4.5e9, G13=4.5e9, G23=4.0e9,
-        nu12=0.3, nu13=0.3, nu23=0.4, rho=2000.0,
+        E1=45e9,
+        E2=12e9,
+        E3=12e9,
+        G12=4.5e9,
+        G13=4.5e9,
+        G23=4.0e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=2000.0,
         name="glass_ud",
     )
 
 
 def _carbon_ud():
     return OrthotropicMaterial(
-        E1=140e9, E2=10e9, E3=10e9,
-        G12=5e9, G13=5e9, G23=3.5e9,
-        nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
         name="carbon_ud",
     )
 
@@ -226,8 +240,13 @@ def test_hollow_airfoil_skin_only(tmp_path):
     glass = _glass_ud()
     carbon = _carbon_ud()
     path, info = airfoil_hollow(
-        tmp_path, naca="0024", chord=1.0, skin_t=0.005, spar_t=0.020,
-        web_loc=None, ds=0.04,
+        tmp_path,
+        naca="0024",
+        chord=1.0,
+        skin_t=0.005,
+        spar_t=0.020,
+        web_loc=None,
+        ds=0.04,
     )
     inp = SectionInput(
         mesh_path=path,
@@ -270,8 +289,15 @@ def test_shear_centre_offset_for_asymmetric_airfoil(tmp_path):
     glass = _glass_ud()
     carbon = _carbon_ud()
     path, info = airfoil_hollow(
-        tmp_path, naca="0024", chord=1.0, skin_t=0.005, spar_t=0.020,
-        web_loc=0.4, web_t=0.005, ds=0.04, wns=4,
+        tmp_path,
+        naca="0024",
+        chord=1.0,
+        skin_t=0.005,
+        spar_t=0.020,
+        web_loc=0.4,
+        web_t=0.005,
+        ds=0.04,
+        wns=4,
     )
     inp = SectionInput(
         mesh_path=path,
@@ -295,8 +321,13 @@ def test_hollow_airfoil_with_web(tmp_path):
     carbon = _carbon_ud()
 
     path_no, info_no = airfoil_hollow(
-        tmp_path / "no_web", naca="0024", chord=1.0, skin_t=0.005, spar_t=0.020,
-        web_loc=None, ds=0.04,
+        tmp_path / "no_web",
+        naca="0024",
+        chord=1.0,
+        skin_t=0.005,
+        spar_t=0.020,
+        web_loc=None,
+        ds=0.04,
     )
     (tmp_path / "no_web").mkdir(exist_ok=True)
     inp_no = SectionInput(
@@ -306,8 +337,15 @@ def test_hollow_airfoil_with_web(tmp_path):
     res_no = solve(inp_no)
 
     path_w, info_w = airfoil_hollow(
-        tmp_path / "with_web", naca="0024", chord=1.0, skin_t=0.005, spar_t=0.020,
-        web_loc=0.4, web_t=0.005, ds=0.04, wns=4,
+        tmp_path / "with_web",
+        naca="0024",
+        chord=1.0,
+        skin_t=0.005,
+        spar_t=0.020,
+        web_loc=0.4,
+        web_t=0.005,
+        ds=0.04,
+        wns=4,
     )
     (tmp_path / "with_web").mkdir(exist_ok=True)
     inp_w = SectionInput(
@@ -331,7 +369,9 @@ def test_airfoil_solid_isotropic(tmp_path):
     """Solid (filled) NACA0012-like section, isotropic. Used as a
     reference for the hollow composite cases."""
     iso = IsotropicMaterial(E=70e9, nu=0.3, rho=2700.0)
-    path, info = airfoil_solid(tmp_path, chord=1.0, thickness=0.12, n_chord=32, n_thick=8)
+    path, info = airfoil_solid(
+        tmp_path, chord=1.0, thickness=0.12, n_chord=32, n_thick=8
+    )
     inp = SectionInput(mesh_path=path, region_materials={1: RegionMat(material=iso)})
     res = solve(inp)
     np.testing.assert_allclose(res.K[2, 2], iso.E * info["A"], rtol=2e-2)

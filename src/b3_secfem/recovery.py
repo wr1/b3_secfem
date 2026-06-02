@@ -57,7 +57,7 @@ class StrainField(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
-    sigma: np.ndarray    # (6, n_cells, 6) Voigt stress
+    sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     cell_areas: np.ndarray  # (n_cells,)
 
 
@@ -87,7 +87,7 @@ class UnitLoadStrainField(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
-    sigma: np.ndarray    # (6, n_cells, 6) Voigt stress
+    sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     cell_areas: np.ndarray  # (n_cells,)
 
 
@@ -187,7 +187,12 @@ def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
     The returned arrays have shape (6, n_cells, 6) with the same Voigt
     convention and cell ordering as ``recover_strains``.
     """
-    if result.R is None or result.u_solutions is None or result.C_func is None or result.mesh is None:
+    if (
+        result.R is None
+        or result.u_solutions is None
+        or result.C_func is None
+        or result.mesh is None
+    ):
         msg = "result lacks dolfinx state or basis-resultant R (was it constructed manually?)"
         raise ValueError(msg)
 
@@ -196,7 +201,7 @@ def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
     sig_b = basis.sigma
     areas = basis.cell_areas
 
-    Gamma = np.linalg.solve(result.R, np.eye(6))   # column k = inv(R) @ e_k
+    Gamma = np.linalg.solve(result.R, np.eye(6))  # column k = inv(R) @ e_k
     eps_out = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
     sig_out = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
 

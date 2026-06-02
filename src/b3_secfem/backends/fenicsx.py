@@ -57,7 +57,6 @@ def assemble_stiffness_matrix(
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_matrix
-    from petsc4py import PETSc
 
     from ..forms import stiffness_bilinear
     from ..spaces import (
@@ -65,8 +64,6 @@ def assemble_stiffness_matrix(
         make_displacement_space,
         make_stiffness_space,
     )
-
-    n_cells = C_per_cell.shape[0]
 
     # Ensure connectivity (sometimes needed when calling helpers directly)
     mesh.topology.create_connectivity(mesh.topology.dim, mesh.topology.dim)

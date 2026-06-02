@@ -107,14 +107,17 @@ def test_mfem_rectangle_matches_closed_form():
         make_rectangle_xdmf(p, nx=16, ny=12)
         inp = SectionInput(
             mesh_path=p,
-            region_materials={1: RegionMat(material=IsotropicMaterial(E=E, nu=nu, rho=rho))},
-            degree=2, backend="mfem",
+            region_materials={
+                1: RegionMat(material=IsotropicMaterial(E=E, nu=nu, rho=rho))
+            },
+            degree=2,
+            backend="mfem",
         )
         res = solve(inp)
 
     assert res.backend == "mfem"
-    assert np.isclose(res.K[2, 2], E * A, rtol=1e-9)               # E*A
-    assert np.isclose(res.K[3, 3], E * a * b**3 / 12, rtol=1e-9)   # E*Ixx
-    assert np.isclose(res.K[4, 4], E * b * a**3 / 12, rtol=1e-9)   # E*Iyy
-    assert np.isclose(res.M[0, 0], rho * A, rtol=1e-9)            # rho*A
-    assert np.isclose(res.K_section_xy, G * A, rtol=1e-6)         # G*A
+    assert np.isclose(res.K[2, 2], E * A, rtol=1e-9)  # E*A
+    assert np.isclose(res.K[3, 3], E * a * b**3 / 12, rtol=1e-9)  # E*Ixx
+    assert np.isclose(res.K[4, 4], E * b * a**3 / 12, rtol=1e-9)  # E*Iyy
+    assert np.isclose(res.M[0, 0], rho * A, rtol=1e-9)  # rho*A
+    assert np.isclose(res.K_section_xy, G * A, rtol=1e-6)  # G*A

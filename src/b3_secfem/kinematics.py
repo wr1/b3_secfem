@@ -22,11 +22,13 @@ def grad3d(u: Any) -> Any:
     import ufl
 
     g = ufl.grad(u)  # shape (3, 2): du_i / dx_j with j in {x, y}
-    return ufl.as_tensor([
-        [g[0, 0], g[0, 1], 0.0],
-        [g[1, 0], g[1, 1], 0.0],
-        [g[2, 0], g[2, 1], 0.0],
-    ])
+    return ufl.as_tensor(
+        [
+            [g[0, 0], g[0, 1], 0.0],
+            [g[1, 0], g[1, 1], 0.0],
+            [g[2, 0], g[2, 1], 0.0],
+        ]
+    )
 
 
 def epsilon(u: Any) -> Any:
@@ -41,14 +43,16 @@ def voigt_strain(u: Any) -> Any:
     import ufl
 
     e = epsilon(u)
-    return ufl.as_vector([
-        e[0, 0],
-        e[1, 1],
-        e[2, 2],
-        2.0 * e[1, 2],
-        2.0 * e[0, 2],
-        2.0 * e[0, 1],
-    ])
+    return ufl.as_vector(
+        [
+            e[0, 0],
+            e[1, 1],
+            e[2, 2],
+            2.0 * e[1, 2],
+            2.0 * e[0, 2],
+            2.0 * e[0, 1],
+        ]
+    )
 
 
 def sigma_voigt(C_func: Any, u: Any) -> Any:
@@ -85,11 +89,13 @@ def voigt_to_tensor(s_v: Any) -> Any:
     """Voigt-stress 6-vector to 3x3 symmetric stress tensor."""
     import ufl
 
-    return ufl.as_tensor([
-        [s_v[0], s_v[5], s_v[4]],
-        [s_v[5], s_v[1], s_v[3]],
-        [s_v[4], s_v[3], s_v[2]],
-    ])
+    return ufl.as_tensor(
+        [
+            [s_v[0], s_v[5], s_v[4]],
+            [s_v[5], s_v[1], s_v[3]],
+            [s_v[4], s_v[3], s_v[2]],
+        ]
+    )
 
 
 def rigid_body_displacement(x: np.ndarray, mode: int) -> np.ndarray:

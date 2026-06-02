@@ -41,17 +41,20 @@ TEST_CASES = [
     Case(
         "iso_ring",
         lambda: gen_ring(R=0.05, t=0.005, n_circ=32, n_rad=2),
-        STEEL, is_iso=True,
+        STEEL,
+        is_iso=True,
     ),
     Case(
         "iso_ellipse_solid",
         lambda: gen_ellipse_solid(a=0.06, b=0.02, n_circ=48, n_rad=10),
-        STEEL, is_iso=True,
+        STEEL,
+        is_iso=True,
     ),
     Case(
         "iso_ellipse_hollow",
         lambda: gen_ellipse_hollow(a=0.06, b=0.02, t=0.005, n_circ=32, n_rad=2),
-        STEEL, is_iso=True,
+        STEEL,
+        is_iso=True,
     ),
 ]
 

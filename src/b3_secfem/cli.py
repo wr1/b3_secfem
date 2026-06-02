@@ -80,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     inp = _build_input(spec)
 
     from .solver import solve
+
     res = solve(inp)
 
     console = Console()
