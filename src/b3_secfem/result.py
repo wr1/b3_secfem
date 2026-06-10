@@ -11,12 +11,16 @@ from pydantic import BaseModel, ConfigDict
 class SectionResult(BaseModel):
     """Result of a single cross-section solve.
 
-    K, M, S are pure numpy arrays (6, 6) in [Fx, Fy, Fz, Mx, My, Mz] order.
+    K, M, S, R are pure numpy arrays (6, 6) in [Fx, Fy, Fz, Mx, My, Mz] order.
     Centres are (x, y) tuples in section coordinates.
     mass_center is the rho-weighted centroid; elastic_center is its alias for compat.
 
-    u_solutions, C_func, mesh are dolfinx objects retained for downstream
-    strain / stress recovery; they are not validated by Pydantic.
+    The ``backend`` tag records which FEM engine produced the result ("fenicsx"
+    or "mfem"). The four optional payload fields (u_solutions, inplane_shear_warping,
+    C_func, mesh) contain backend-specific objects (dolfinx Functions/Mesh or
+    mfem GridFunctions/Mesh) retained **only** for downstream strain/stress
+    recovery and visualisation. They are not validated by Pydantic and are
+    unnecessary if you only consume K/M/centres.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -25,6 +29,7 @@ class SectionResult(BaseModel):
     M: np.ndarray
     S: np.ndarray
     R: np.ndarray
+    backend: str = "fenicsx"
     """6x6 basis-resultant matrix: R[a, i] = a-th generalised-force resultant
     of the i-th chain-basis strain field. Together with the energy matrix,
     ``K = R @ inv(S_energy) @ R^T``. Needed by ``recover_unit_load_strains``
@@ -48,20 +53,21 @@ class SectionResult(BaseModel):
 
     u_solutions: list[Any] | None = None
     inplane_shear_warping: Any | None = None
-    """Warping field ``w_xy`` (3D displacement on 2D mesh) returned by the
-    in-plane-shear cell problem. Used by viz.plot_warping for the new
-    7th deformation mode."""
+    """Backend-specific warping field (dolfinx Function or mfem GridFunction)
+    for the 7th in-plane-shear cell problem. Used by viz.plot_warping."""
     C_func: Any | None = None
     mesh: Any | None = None
 
     @property
     def K_gxbeam_order(self) -> np.ndarray:
         from .post import to_gxbeam_order
+
         return to_gxbeam_order(self.K)
 
     @property
     def K_anba_order(self) -> np.ndarray:
         from .post import to_anba_order
+
         return to_anba_order(self.K)
 
     def __repr__(self) -> str:  # pragma: no cover

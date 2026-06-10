@@ -60,8 +60,8 @@ def compute_centres(
 
     return {
         "tension": tension,
-        "mass": elastic,      # the rho one
-        "elastic": elastic,   # compat alias (mass centre)
+        "mass": elastic,  # the rho one
+        "elastic": elastic,  # compat alias (mass centre)
         "shear": shear,
     }
 

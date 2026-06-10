@@ -43,9 +43,7 @@ def make_density_space(mesh: Any) -> Any:
     return fem.functionspace(mesh, e)
 
 
-def fill_per_cell_stiffness(
-    Q_func: Any, C_per_cell: np.ndarray
-) -> None:
+def fill_per_cell_stiffness(Q_func: Any, C_per_cell: np.ndarray) -> None:
     """Populate a DG-0 (6, 6) Function from a per-cell (n_cells, 6, 6) array."""
     arr = Q_func.x.array
     # Layout: dolfinx flattens DG-0 tensor with last index fastest. For shape

@@ -27,6 +27,7 @@ def _build_input(spec: dict) -> SectionInput:
         {
           "mesh_path": "section.xdmf",
           "degree": 2,
+          "backend": "fenicsx",
           "region_materials": {
             "1": {
               "material": {"type": "isotropic", "E": 1e9, "nu": 0.3, "rho": 1000},
@@ -48,11 +49,15 @@ def _build_input(spec: dict) -> SectionInput:
             beta_deg=entry.get("beta_deg", 0.0),
             alpha_deg=entry.get("alpha_deg", 0.0),
         )
-    return SectionInput(
+    inp = SectionInput(
         mesh_path=Path(spec["mesh_path"]),
         degree=spec.get("degree", 2),
         region_materials=rm,
     )
+    if "backend" in spec:
+        # pydantic will validate the Literal
+        inp = inp.model_copy(update={"backend": spec["backend"]})
+    return inp
 
 
 def _print_K(K: np.ndarray, console: Console) -> None:
@@ -75,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     inp = _build_input(spec)
 
     from .solver import solve
+
     res = solve(inp)
 
     console = Console()

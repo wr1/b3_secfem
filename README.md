@@ -17,9 +17,12 @@ FEniCS) and provides an independent cross-check on both.
 - `anba4_orig` runs on legacy FEniCS 2019 (Docker / pinned conda env), is
   triangle-only, and has a `-sin` rotation sign quirk.
 
-`b3_secfem` is built on **FEniCSx (dolfinx ≥ 0.9, pip-installable)**,
-supports triangles and quadrilaterals, and is **explicit about fibre and
-ply directions** at every API surface.
+`b3_secfem` is built on **FEniCSx (dolfinx ≥ 0.9, default)** or the optional
+**MFEM** backend (PyMFEM serial). It supports triangles and quadrilaterals
+and is **explicit about fibre and ply directions** at every API surface.
+
+The two backends give numerically equivalent results (within ~1e-6 on K)
+and are intended for cross-validation of the formulation.
 
 ## Quickstart
 

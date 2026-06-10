@@ -62,9 +62,9 @@ def chain_rhs_stage1(C_func: Any, v: Any, d0: Any) -> Any:
 def chain_rhs_stage2(C_func: Any, v: Any, d0: Any, d1: Any) -> Any:
     """RHS for ``E d_2 = M d_0 - H d_1`` (transverse shear).
 
-        L(v) = int eps_z(v)^T C eps_z(d_0) dA           # M d_0
-             - int eps_xy(v)^T C eps_z(d_1) dA          # -C  d_1
-             + int eps_z(v)^T C eps_xy(d_1) dA          # +C^T d_1
+    L(v) = int eps_z(v)^T C eps_z(d_0) dA           # M d_0
+         - int eps_xy(v)^T C eps_z(d_1) dA          # -C  d_1
+         + int eps_z(v)^T C eps_xy(d_1) dA          # +C^T d_1
     """
     import ufl
 
@@ -88,13 +88,13 @@ def d0_kinematic(mode: int, x: Any) -> Any:
     import ufl
 
     if mode in (0, 4):
-        return ufl.as_vector([0.0, 0.0, x[0]])      # bending about y
+        return ufl.as_vector([0.0, 0.0, x[0]])  # bending about y
     if mode in (1, 3):
-        return ufl.as_vector([0.0, 0.0, -x[1]])     # bending about x
+        return ufl.as_vector([0.0, 0.0, -x[1]])  # bending about x
     if mode == 2:
-        return ufl.as_vector([0.0, 0.0, 1.0])       # axial
+        return ufl.as_vector([0.0, 0.0, 1.0])  # axial
     if mode == 5:
-        return ufl.as_vector([-x[1], x[0], 0.0])    # twist
+        return ufl.as_vector([-x[1], x[0], 0.0])  # twist
     msg = f"d0_kinematic: mode must be 0..5, got {mode}"
     raise ValueError(msg)
 

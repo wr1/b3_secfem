@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -35,12 +35,22 @@ class SectionInput(BaseModel):
 
     Mode is chosen at solve time by which (exactly one) set of fields is
     populated.
+
+    The ``backend`` field selects the FEM engine (default "fenicsx" for
+    dolfinx/UFL/PETSc; "mfem" for PyMFEM serial). Both produce numerically
+    equivalent K/M/centres/recovery fields on the same input.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    mesh_path: Path = Field(..., description="XDMF mesh file (or VTU via mesh.from_gxbeam_vtu)")
+    mesh_path: Path = Field(
+        ..., description="XDMF mesh file (or VTU via mesh.from_gxbeam_vtu)"
+    )
     degree: int = Field(2, ge=1, le=3, description="CG polynomial degree")
+    backend: Literal["fenicsx", "mfem"] = Field(
+        "fenicsx",
+        description="FEM backend: 'fenicsx' (default, requires dolfinx) or 'mfem' (PyMFEM)",
+    )
 
     region_materials: dict[int, RegionMat] | None = None
 
