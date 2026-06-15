@@ -21,8 +21,8 @@ FEniCS) and provides an independent cross-check on both.
 **MFEM** backend (PyMFEM serial). It supports triangles and quadrilaterals
 and is **explicit about fibre and ply directions** at every API surface.
 
-The two backends give numerically equivalent results (within ~1e-6 on K)
-and are intended for cross-validation of the formulation.
+The two backends give numerically equivalent results and are intended for
+cross-validation of the formulation. See [Backends](#backends) below.
 
 ## Quickstart
 
@@ -55,6 +55,57 @@ print(res.shear_center)
 - Material rotation angles `(beta_deg, alpha_deg)`:
   - `(0, 0)` → fibre along beam axis z (axial — typical UD spar plies).
   - `alpha=90` → fibre fully in-plane at angle `beta` from x.
+
+## Backends
+
+The solver is pluggable. Select the engine with `SectionInput.backend` or the
+`backend=` kwarg to `solve()`:
+
+```python
+res = solve(inp, backend="mfem")   # default is "fenicsx"
+```
+
+- **`"fenicsx"`** (default) — full dolfinx / UFL / PETSc path. Produces the
+  complete `SectionResult` (K, M, centres, and strain/stress recovery). The
+  4-D rigid-body null space of the in-plane operator is projected out with a
+  PETSc `MatNullSpace`.
+
+- **`"mfem"`** — PyMFEM serial path (`mfem.ser`), an independent assembly and
+  FE engine for cross-validation. A single custom `_VoigtFormIntegrator`
+  assembles the three section operators (`E` in-plane stiffness, `Cmat` xy–z
+  coupling, `Mmat` pure-z); the Morandini two-stage chain then reduces to
+  matrix-vector products, the singular systems are solved via a bordered KKT
+  factorisation (analogue of the PETSc null-space projection), and
+  `K = R S⁻¹ Rᵀ`, `M`, centres and `K_xy` follow from a quadrature pass.
+  `solve(backend="mfem")` returns a complete `SectionResult`, validated
+  against fenicsx to ~1e-11 relative on K / M / centres / K_xy for isotropic
+  and orthotropic sections.
+
+  **Not yet ported:** strain/stress field recovery (`recover_strains`) and the
+  input-cell-order remap that `per_cell_material` needs on dolfinx-renumbered
+  meshes (region-tagged and uniform sections work).
+
+Install the MFEM backend with `pip install mfem` (or conda); it pulls in
+`scipy`, used only for the singular-system linear algebra. The MFEM backend
+has fewer binary-compatibility issues than dolfinx on some platforms.
+
+### Cross-backend validation and timing
+
+`b3_secfem.bench` compares the two engines:
+
+- `run_comparison` assembles `E` with both engines on the same mesh and
+  compares permutation-invariant quantities (the two engines number global
+  DOFs differently, so operators match only up to `P E Pᵀ`): sorted spectrum,
+  trace, and the 4-D rigid-body null space.
+- `run_full_comparison` runs the complete `solve()` per backend and diffs the
+  physical outputs directly (K, M, K_xy, centres — no permutation ambiguity).
+- `time_backends` gives an assembly-timing table. The MFEM custom integrator
+  is a pure-Python per-element loop: faster than fenicsx on tiny meshes (no
+  form compilation) but several× slower on large ones.
+
+Each backend runs in its own subprocess — importing both dolfinx (PETSc/MPI)
+and mfem into one interpreter assembles fine but segfaults at teardown. See
+`tests/test_backend_comparison.py` and `examples/compare_backends.py`.
 
 ## v0.1 limitations
 
