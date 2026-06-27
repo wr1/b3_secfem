@@ -42,7 +42,7 @@ import numpy as np
 ROOT = Path(__file__).parent.resolve()
 OUT = ROOT / "airfoil_stress_out"
 sys.path.insert(0, str(ROOT.parent / "tests"))
-from _meshlib import airfoil_hollow
+from b3_secfem._meshlib import airfoil_hollow
 
 from b3_secfem import (
     OrthotropicMaterial,
