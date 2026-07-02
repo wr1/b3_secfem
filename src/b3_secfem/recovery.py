@@ -58,6 +58,7 @@ class StrainField(BaseModel):
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
     sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
+    sigma_mat: np.ndarray  # (6, n_cells, 6) Voigt stress in local (material) coord sys
     cell_areas: np.ndarray  # (n_cells,)
 
 
@@ -88,6 +89,7 @@ class UnitLoadStrainField(BaseModel):
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
     sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
+    sigma_mat: np.ndarray  # (6, n_cells, 6) Voigt stress in local (material) coord sys
     cell_areas: np.ndarray  # (n_cells,)
 
 
@@ -113,16 +115,19 @@ def recover_strains(result: SectionResult) -> StrainField:
 
     mesh = result.mesh
     Q_func = result.C_func
+    Qmat_func = result.Cmat_func
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     cell_areas = _cell_areas(mesh)
 
-    eps = np.zeros((6, n_cells, 6))
-    sig = np.zeros((6, n_cells, 6))
+    eps  = np.zeros((6, n_cells, 6))
+    sig  = np.zeros((6, n_cells, 6))
+    sigM = np.zeros((6, n_cells, 6))
 
     x = ufl.SpatialCoordinate(mesh)
     DG0 = fem.functionspace(mesh, ("DG", 0))
     v = ufl.TestFunction(DG0)
-    C_arr = Q_func.x.array.reshape(n_cells, 6, 6)
+    C_arr  = Q_func.x.array.reshape(n_cells, 6, 6)
+    C_arrM = Qmat_func.x.array.reshape(n_cells, 6, 6)
 
     primary = result.u_solutions
     for i in ALL_MODES:
@@ -146,9 +151,10 @@ def recover_strains(result: SectionResult) -> StrainField:
             eps[i, :, k_voigt] = b.array.copy() / cell_areas
 
         for k in range(n_cells):
-            sig[i, k, :] = C_arr[k] @ eps[i, k, :]
+            sig[ i, k, :] = C_arr[k]  @ eps[i, k, :]
+            sigM[i, k, :] = C_arrM[k] @ eps[i, k, :]
 
-    return StrainField(epsilon=eps, sigma=sig, cell_areas=cell_areas)
+    return StrainField(epsilon=eps, sigma=sig, sigma_mat=sigM, cell_areas=cell_areas)
 
 
 def _cell_areas(mesh: Any) -> np.ndarray:
@@ -196,13 +202,15 @@ def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
         msg = "result lacks dolfinx state or basis-resultant R (was it constructed manually?)"
         raise ValueError(msg)
 
-    basis = recover_strains(result)
-    eps_b = basis.epsilon
-    sig_b = basis.sigma
-    areas = basis.cell_areas
+    basis  = recover_strains(result)
+    eps_b  = basis.epsilon
+    sig_b  = basis.sigma
+    sigM_b = basis.sigma_mat
+    areas  = basis.cell_areas
 
     Gamma = np.linalg.solve(result.R, np.eye(6))  # column k = inv(R) @ e_k
-    eps_out = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
-    sig_out = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
+    eps_out  = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
+    sig_out  = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
+    sigM_out = np.einsum("ki,icv->kcv", Gamma.T, sigM_b)
 
-    return UnitLoadStrainField(epsilon=eps_out, sigma=sig_out, cell_areas=areas)
+    return UnitLoadStrainField(epsilon=eps_out, sigma=sig_out, sigma_mat=sigM_out, cell_areas=areas)

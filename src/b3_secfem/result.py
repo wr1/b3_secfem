@@ -56,7 +56,9 @@ class SectionResult(BaseModel):
     """Backend-specific warping field (dolfinx Function or mfem GridFunction)
     for the 7th in-plane-shear cell problem. Used by viz.plot_warping."""
     C_func: Any | None = None
+    Cmat_func: Any | None = None
     mesh: Any | None = None
+    oci: np.ndarray
 
     @property
     def K_gxbeam_order(self) -> np.ndarray:
