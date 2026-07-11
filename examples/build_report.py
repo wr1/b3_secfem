@@ -268,6 +268,7 @@ def _typst_for_run(run: dict, png_rel: str) -> str:
     cx, cy = run["res"].tension_center
     sx, sy = run["res"].shear_center
     ex, ey = run["res"].elastic_center
+    mx, my = run["res"].mass_center
     return f"""
 == {run['label']}
 
@@ -275,13 +276,13 @@ def _typst_for_run(run: dict, png_rel: str) -> str:
 
 #figure(
   image("{png_rel}", width: 95%),
-  caption: [Mesh with centres (red = tension, blue = elastic, green = shear) and bending principal axes],
+  caption: [Mesh with centres (red = elastic/tension, orange = mass, green = shear) and neutral axes (from elastic centre)],
 )
 
 *Centres:*
-- tension: ({cx:+.3e}, {cy:+.3e})
-- elastic: ({ex:+.3e}, {ey:+.3e})
-- shear:   ({sx:+.3e}, {sy:+.3e})
+- tension/elastic: ({cx:+.3e}, {cy:+.3e})
+- mass:            ({mx:+.3e}, {my:+.3e})
+- shear:           ({sx:+.3e}, {sy:+.3e})
 
 *Cross-section stiffness $K$ (6x6, $[F_x, F_y, F_z, M_x, M_y, M_z]$, units SI):*
 

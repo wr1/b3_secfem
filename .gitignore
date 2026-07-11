@@ -24,6 +24,9 @@ _*_tmp/
 examples/report_out/
 examples/deformed_out/
 examples/cross_check_out/
+examples/example_out/
+examples/airfoil_stress_out/
+*.npz
 
 # Editor / tool state
 .claude/

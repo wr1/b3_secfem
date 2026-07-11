@@ -59,9 +59,16 @@ def test_isotropic_invariant_under_rotation():
 def test_round_trip_identity():
     """Rotating then un-rotating returns the original stiffness."""
     mat = OrthotropicMaterial(
-        E1=140e9, E2=10e9, E3=10e9,
-        G12=5e9, G13=5e9, G23=3.5e9,
-        nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
     )
     C = mat.C_local()
     for beta in (15.0, 30.0, 45.0, 90.0):
@@ -77,9 +84,16 @@ def test_round_trip_identity():
 
 def test_rotated_stiffness_is_symmetric():
     mat = OrthotropicMaterial(
-        E1=140e9, E2=10e9, E3=10e9,
-        G12=5e9, G13=5e9, G23=3.5e9,
-        nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
     )
     C = mat.C_local()
     for beta, alpha in ((30.0, 0.0), (45.0, 20.0), (-17.0, 33.0), (12.0, 90.0)):
@@ -89,9 +103,16 @@ def test_rotated_stiffness_is_symmetric():
 
 def test_rotated_stiffness_positive_definite():
     mat = OrthotropicMaterial(
-        E1=140e9, E2=10e9, E3=10e9,
-        G12=5e9, G13=5e9, G23=3.5e9,
-        nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
     )
     C = mat.C_local()
     for beta in np.linspace(0.0, 180.0, 9):
@@ -111,9 +132,16 @@ def test_axial_orientation_has_E1_along_z():
     misalignment).
     """
     mat = OrthotropicMaterial(
-        E1=140e9, E2=10e9, E3=10e9,
-        G12=5e9, G13=5e9, G23=3.5e9,
-        nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
     )
     C = mat.C_local()
     C_global = rotate_stiffness_6x6(C, 0.0, 0.0)  # fibre along z

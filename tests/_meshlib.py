@@ -45,10 +45,14 @@ def _write_quad_mesh(
     # Validate CCW winding (signed shoelace area > 0).
     p = coords[quads]
     sa = (
-        p[:, 0, 0] * p[:, 1, 1] - p[:, 1, 0] * p[:, 0, 1]
-        + p[:, 1, 0] * p[:, 2, 1] - p[:, 2, 0] * p[:, 1, 1]
-        + p[:, 2, 0] * p[:, 3, 1] - p[:, 3, 0] * p[:, 2, 1]
-        + p[:, 3, 0] * p[:, 0, 1] - p[:, 0, 0] * p[:, 3, 1]
+        p[:, 0, 0] * p[:, 1, 1]
+        - p[:, 1, 0] * p[:, 0, 1]
+        + p[:, 1, 0] * p[:, 2, 1]
+        - p[:, 2, 0] * p[:, 1, 1]
+        + p[:, 2, 0] * p[:, 3, 1]
+        - p[:, 3, 0] * p[:, 2, 1]
+        + p[:, 3, 0] * p[:, 0, 1]
+        - p[:, 0, 0] * p[:, 3, 1]
     )
     flip = sa < 0
     if flip.any():
@@ -110,14 +114,18 @@ def hollow_cylinder(
 
     R_o = R_mid + t / 2
     R_i = R_mid - t / 2
-    A = np.pi * (R_o ** 2 - R_i ** 2)
-    I = np.pi * (R_o ** 4 - R_i ** 4) / 4.0
-    J = np.pi * (R_o ** 4 - R_i ** 4) / 2.0
+    A = np.pi * (R_o**2 - R_i**2)
+    I = np.pi * (R_o**4 - R_i**4) / 4.0
+    J = np.pi * (R_o**4 - R_i**4) / 2.0
     return path, {"A": A, "I": I, "J": J, "R_mid": R_mid, "t": t}
 
 
 def solid_ellipse(
-    tmp_path: Path, a: float, b: float, n_circ: int = 64, n_rad: int = 12,
+    tmp_path: Path,
+    a: float,
+    b: float,
+    n_circ: int = 64,
+    n_rad: int = 12,
     hole_frac: float = 0.02,
 ) -> tuple[Path, dict]:
     """Filled ellipse with semi-axes ``(a, b)``.
@@ -155,19 +163,28 @@ def solid_ellipse(
     path = tmp_path / "ellipse_solid.xdmf"
     _write_quad_mesh(path, coords, quads)
 
-    A = np.pi * a * b * (1 - hole_frac ** 2)
-    I_xx = (np.pi / 4) * a * b ** 3 * (1 - hole_frac ** 4)
-    I_yy = (np.pi / 4) * a ** 3 * b * (1 - hole_frac ** 4)
-    J_solid = np.pi * a ** 3 * b ** 3 / (a ** 2 + b ** 2)
+    A = np.pi * a * b * (1 - hole_frac**2)
+    I_xx = (np.pi / 4) * a * b**3 * (1 - hole_frac**4)
+    I_yy = (np.pi / 4) * a**3 * b * (1 - hole_frac**4)
+    J_solid = np.pi * a**3 * b**3 / (a**2 + b**2)
     return path, {
-        "A": A, "I_xx": I_xx, "I_yy": I_yy, "J_solid": J_solid,
-        "a": a, "b": b, "hole_frac": hole_frac,
+        "A": A,
+        "I_xx": I_xx,
+        "I_yy": I_yy,
+        "J_solid": J_solid,
+        "a": a,
+        "b": b,
+        "hole_frac": hole_frac,
     }
 
 
 def hollow_ellipse(
-    tmp_path: Path, a: float, b: float, t: float,
-    n_circ: int = 64, n_rad: int = 4,
+    tmp_path: Path,
+    a: float,
+    b: float,
+    t: float,
+    n_circ: int = 64,
+    n_rad: int = 4,
 ) -> tuple[Path, dict]:
     """Annular ellipse: outer (a, b), inner (a - t, b - t) (concentric, similar).
 
@@ -209,22 +226,37 @@ def hollow_ellipse(
     _write_quad_mesh(path, coords, quads)
 
     A = np.pi * (a * b - a_i * b_i)
-    I_xx = (np.pi / 4) * (a * b ** 3 - a_i * b_i ** 3)
-    I_yy = (np.pi / 4) * (a ** 3 * b - a_i ** 3 * b_i)
-    return path, {"A": A, "I_xx": I_xx, "I_yy": I_yy,
-                  "a": a, "b": b, "t": t, "a_i": a_i, "b_i": b_i}
+    I_xx = (np.pi / 4) * (a * b**3 - a_i * b_i**3)
+    I_yy = (np.pi / 4) * (a**3 * b - a_i**3 * b_i)
+    return path, {
+        "A": A,
+        "I_xx": I_xx,
+        "I_yy": I_yy,
+        "a": a,
+        "b": b,
+        "t": t,
+        "a_i": a_i,
+        "b_i": b_i,
+    }
 
 
 def i_beam(
-    tmp_path: Path, b: float, h: float, t_w: float, t_f: float,
-    n_b: int = 16, n_h: int = 24, n_tw: int = 4, n_tf: int = 4,
+    tmp_path: Path,
+    b: float,
+    h: float,
+    t_w: float,
+    t_f: float,
+    n_b: int = 16,
+    n_h: int = 24,
+    n_tw: int = 4,
+    n_tf: int = 4,
 ) -> tuple[Path, dict]:
     """Symmetric I-beam: top + bottom flanges (b x t_f) plus web (t_w x (h - 2 t_f)).
 
     Built from three structured rectangular panels stitched at shared
     nodes. Returns analytic A and I_xx (strong-axis) for validation.
     """
-    h_w = h - 2 * t_f                         # web height (between flange interiors)
+    h_w = h - 2 * t_f  # web height (between flange interiors)
     if h_w <= 0:
         msg = f"web height must be > 0; got h={h}, t_f={t_f}"
         raise ValueError(msg)
@@ -238,7 +270,7 @@ def i_beam(
     rnd = 1_000_000
 
     def get(x: float, y: float) -> int:
-        key = (int(round(x * rnd)), int(round(y * rnd)))
+        key = (round(x * rnd), round(y * rnd))
         if key in node_index:
             return node_index[key]
         node_index[key] = len(coords)
@@ -250,10 +282,10 @@ def i_beam(
         ys = np.linspace(y0, y1, ny + 1)
         for j in range(ny):
             for i in range(nx):
-                n00 = get(xs[i],     ys[j])
+                n00 = get(xs[i], ys[j])
                 n10 = get(xs[i + 1], ys[j])
                 n11 = get(xs[i + 1], ys[j + 1])
-                n01 = get(xs[i],     ys[j + 1])
+                n01 = get(xs[i], ys[j + 1])
                 quads.append((n00, n10, n11, n01))
 
     # The web's grid lines must align with x = -t_w/2 and x = +t_w/2 in the
@@ -262,12 +294,12 @@ def i_beam(
     # [t_w/2, b/2], each with appropriate nx; similarly for the top flange.
     n_left = max(1, n_b // 2 - n_tw // 2)
     n_right = n_left
-    panel(-b / 2,  -t_w / 2, -h / 2, -h_w / 2, n_left,  n_tf)
-    panel(-t_w / 2, t_w / 2, -h / 2, -h_w / 2, n_tw,    n_tf)
-    panel( t_w / 2, b / 2,   -h / 2, -h_w / 2, n_right, n_tf)
-    panel(-b / 2,  -t_w / 2,  h_w / 2, h / 2,  n_left,  n_tf)
-    panel(-t_w / 2, t_w / 2,  h_w / 2, h / 2,  n_tw,    n_tf)
-    panel( t_w / 2, b / 2,    h_w / 2, h / 2,  n_right, n_tf)
+    panel(-b / 2, -t_w / 2, -h / 2, -h_w / 2, n_left, n_tf)
+    panel(-t_w / 2, t_w / 2, -h / 2, -h_w / 2, n_tw, n_tf)
+    panel(t_w / 2, b / 2, -h / 2, -h_w / 2, n_right, n_tf)
+    panel(-b / 2, -t_w / 2, h_w / 2, h / 2, n_left, n_tf)
+    panel(-t_w / 2, t_w / 2, h_w / 2, h / 2, n_tw, n_tf)
+    panel(t_w / 2, b / 2, h_w / 2, h / 2, n_right, n_tf)
     # Web spans the full inter-flange height (h_w) at width t_w.
     panel(-t_w / 2, t_w / 2, -h_w / 2, h_w / 2, n_tw, n_h)
 
@@ -277,9 +309,17 @@ def i_beam(
     _write_quad_mesh(path, coords_arr, quads_arr)
 
     A = 2 * b * t_f + t_w * h_w
-    I_xx = (b * h ** 3) / 12.0 - ((b - t_w) * h_w ** 3) / 12.0
-    I_yy = (2 * t_f * b ** 3) / 12.0 + (h_w * t_w ** 3) / 12.0
-    return path, {"A": A, "I_xx": I_xx, "I_yy": I_yy, "b": b, "h": h, "t_w": t_w, "t_f": t_f}
+    I_xx = (b * h**3) / 12.0 - ((b - t_w) * h_w**3) / 12.0
+    I_yy = (2 * t_f * b**3) / 12.0 + (h_w * t_w**3) / 12.0
+    return path, {
+        "A": A,
+        "I_xx": I_xx,
+        "I_yy": I_yy,
+        "b": b,
+        "h": h,
+        "t_w": t_w,
+        "t_f": t_f,
+    }
 
 
 def airfoil_hollow(
@@ -310,6 +350,12 @@ def airfoil_hollow(
     The mesh is written to ``tmp_path / "airfoil_hollow.xdmf"`` with
     integer cell tags = (region_id from materials list).
     """
+    # airfoilmesh is the sibling ``b3_af`` package (not on PyPI). It is only
+    # available where ``../b3_af`` was editable-installed (see Makefile). On a
+    # remote/CI runner it is absent, so skip rather than error.
+    import pytest
+
+    pytest.importorskip("airfoilmesh")
     from airfoilmesh import Layer, Material, afmesh, naca4
 
     ply_glass = Material("glass_ud")
@@ -336,10 +382,17 @@ def airfoil_hollow(
         webs = []
 
     nodes, elements, _surf = afmesh(
-        xaf, yaf,
-        chord=chord, twist=0.0, paxis=0.5,
-        xbreak=xbreak, webloc=webloc, segments=segments, webs=webs,
-        ds=ds, wns=wns,
+        xaf,
+        yaf,
+        chord=chord,
+        twist=0.0,
+        paxis=0.5,
+        xbreak=xbreak,
+        webloc=webloc,
+        segments=segments,
+        webs=webs,
+        ds=ds,
+        wns=wns,
     )
 
     coords = np.array([[n.x, n.y] for n in nodes], dtype=np.float64)
@@ -350,8 +403,10 @@ def airfoil_hollow(
     unique = sorted(set(keys))
     key_to_tag = {k: i + 1 for i, k in enumerate(unique)}
     cell_tags = np.array([key_to_tag[k] for k in keys], dtype=np.int32)
-    info_materials = [(tag, name, np.degrees(theta_rad))
-                      for (name, theta_rad), tag in key_to_tag.items()]
+    info_materials = [
+        (tag, name, np.degrees(theta_rad))
+        for (name, theta_rad), tag in key_to_tag.items()
+    ]
 
     name = "airfoil_hollow_with_web" if web_loc is not None else "airfoil_hollow"
     path = tmp_path / f"{name}.xdmf"
@@ -368,8 +423,11 @@ def airfoil_hollow(
 
 
 def airfoil_solid(
-    tmp_path: Path, chord: float = 1.0, thickness: float = 0.12,
-    n_chord: int = 32, n_thick: int = 8,
+    tmp_path: Path,
+    chord: float = 1.0,
+    thickness: float = 0.12,
+    n_chord: int = 32,
+    n_thick: int = 8,
 ) -> tuple[Path, dict]:
     """Solid (filled) airfoil-like section: NACA00xx upper / lower surfaces.
 
@@ -378,9 +436,16 @@ def airfoil_solid(
     """
     eta = np.linspace(0.0, 1.0, n_chord + 1)
     # NACA 00xx half-thickness (closed-trailing-edge form)
-    half_t = (thickness / 0.2) * chord * (
-        0.2969 * np.sqrt(eta) - 0.1260 * eta - 0.3516 * eta ** 2
-        + 0.2843 * eta ** 3 - 0.1036 * eta ** 4
+    half_t = (
+        (thickness / 0.2)
+        * chord
+        * (
+            0.2969 * np.sqrt(eta)
+            - 0.1260 * eta
+            - 0.3516 * eta**2
+            + 0.2843 * eta**3
+            - 0.1036 * eta**4
+        )
     )
     # Through-thickness coordinate xi in [-1, 1]
     xi = np.linspace(-1.0, 1.0, n_thick + 1)
@@ -403,14 +468,21 @@ def airfoil_solid(
     path = tmp_path / "airfoil.xdmf"
     _write_quad_mesh(path, coords, quads)
 
-    # Total area (numerical, by trapezoidal rule on half-thickness)
-    A = 2.0 * np.trapz(half_t, eta * chord)
+    # Total area (numerical, by trapezoidal rule on half-thickness).
+    # np.trapezoid is numpy>=2.0; fall back to np.trapz on numpy 1.x (the
+    # version dolfinx's apt build is ABI-locked to).
+    _trapezoid = getattr(np, "trapezoid", getattr(np, "trapz", None))
+    A = 2.0 * _trapezoid(half_t, eta * chord)
     return path, {"A": A, "chord": chord, "thickness": thickness}
 
 
 def airfoil_with_web(
-    tmp_path: Path, chord: float = 1.0, thickness: float = 0.12,
-    web_x_frac: float = 0.4, n_chord: int = 32, n_thick: int = 8,
+    tmp_path: Path,
+    chord: float = 1.0,
+    thickness: float = 0.12,
+    web_x_frac: float = 0.4,
+    n_chord: int = 32,
+    n_thick: int = 8,
 ) -> tuple[Path, dict]:
     """Airfoil mesh with a tagged shear-web region.
 
@@ -419,9 +491,16 @@ def airfoil_with_web(
     tag = 1 elsewhere. Use with ``region_materials = {1: skin, 2: web}``.
     """
     eta = np.linspace(0.0, 1.0, n_chord + 1)
-    half_t = (thickness / 0.2) * chord * (
-        0.2969 * np.sqrt(eta) - 0.1260 * eta - 0.3516 * eta ** 2
-        + 0.2843 * eta ** 3 - 0.1036 * eta ** 4
+    half_t = (
+        (thickness / 0.2)
+        * chord
+        * (
+            0.2969 * np.sqrt(eta)
+            - 0.1260 * eta
+            - 0.3516 * eta**2
+            + 0.2843 * eta**3
+            - 0.1036 * eta**4
+        )
     )
     xi = np.linspace(-1.0, 1.0, n_thick + 1)
 

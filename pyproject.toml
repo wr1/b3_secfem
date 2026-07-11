@@ -12,14 +12,27 @@ license = "MIT"
 # `uv venv --system-site-packages` so they remain visible.
 dependencies = [
     "meshio>=5.3",
-    "numpy",
+    # numpy is pinned <2 to match the ABI of the system (apt) fenics-dolfinx /
+    # petsc4py build, which is compiled against numpy 1.26.x. Installing numpy 2
+    # makes `import dolfinx` fail with a binary-incompatibility ValueError in
+    # petsc4py. (The mfem 4.8 wheel imports fine under numpy 1.26 despite its
+    # declared numba dependency wanting numpy>=2 -- numba is a soft dep here.)
+    "numpy<2",
     "pydantic>=2",
     "rich",
     "b3_mat",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff", "matplotlib"]
+dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit"]
+# airfoilmesh is the sibling ``b3_af`` package (not published to PyPI). The
+# airfoil-section tests skip when it is absent, so it is opt-in: install with
+# ``pip install -e ../b3_af`` (see Makefile) to exercise them locally.
+airfoil = ["airfoilmesh"]
+# Install with: uv pip install --only-binary=:all: 'mfem>=4.8'  (only the 4.8
+# wheels are published for cp312; older versions are sdist-only and need a
+# native MFEM toolchain). Then re-pin numpy: uv pip install 'numpy<2'.
+mfem = ["mfem>=4.8", "scipy>=1.10"]  # PyMFEM serial + scipy for the singular nullspace solves
 
 [project.scripts]
 b3_secfem = "b3_secfem.cli:main"
@@ -34,8 +47,9 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = ["src/b3_secfem"]
 
-# Workspace inheritance handles b3_mat; airfoilmesh dev dep is optional and
-# unused in the b3_master integration. Original sources block dropped.
+# In the b3_master uv workspace, b3_mat resolves via `workspace = true` and
+# airfoilmesh is unused. For standalone use, the Makefile's `install` target
+# installs both as path-editable sources (../b3_mat, ../b3_af).
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -43,3 +57,12 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests gate dolfinx imports behind pytest.importorskip(), so the heavy
+# imports must legitimately come after a module-level statement.
+"tests/*" = ["E402"]
+# 'I' is the conventional symbol for the second moment of area; keep it.
+"tests/_meshlib.py" = ["E402", "E741"]
+# 'I'/'J'/'D' are the conventional CSR row-pointer / column / data arrays.
+"src/b3_secfem/backends/mfem.py" = ["E741"]

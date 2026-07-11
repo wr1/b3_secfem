@@ -65,11 +65,13 @@ class OrthotropicMaterial(BaseModel):
         nu31 = nu13 * E3 / E1
         nu32 = nu23 * E3 / E2
 
-        S_n = np.array([
-            [1.0 / E1, -nu21 / E2, -nu31 / E3],
-            [-nu12 / E1, 1.0 / E2, -nu32 / E3],
-            [-nu13 / E1, -nu23 / E2, 1.0 / E3],
-        ])
+        S_n = np.array(
+            [
+                [1.0 / E1, -nu21 / E2, -nu31 / E3],
+                [-nu12 / E1, 1.0 / E2, -nu32 / E3],
+                [-nu13 / E1, -nu23 / E2, 1.0 / E3],
+            ]
+        )
         C_n = np.linalg.inv(S_n)
 
         C = np.zeros((6, 6))
@@ -89,10 +91,17 @@ class OrthotropicMaterial(BaseModel):
         onto the beam axis.
         """
         return cls(
-            E1=mat.Ex, E2=mat.Ey, E3=mat.Ez,
-            G12=mat.Gxy, G13=mat.Gxz, G23=mat.Gyz,
-            nu12=mat.nuxy, nu13=mat.nuxz, nu23=mat.nuyz,
-            rho=mat.rho, name=mat.name,
+            E1=mat.Ex,
+            E2=mat.Ey,
+            E3=mat.Ez,
+            G12=mat.Gxy,
+            G13=mat.Gxz,
+            G23=mat.Gyz,
+            nu12=mat.nuxy,
+            nu13=mat.nuxz,
+            nu23=mat.nuyz,
+            rho=mat.rho,
+            name=mat.name,
         )
 
 

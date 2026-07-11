@@ -42,9 +42,9 @@ def assemble_mass(mesh: Any, rho_func: Any) -> np.ndarray:
     x = ufl.SpatialCoordinate(mesh)
     one = fem.Constant(mesh, 1.0)
     forms = {
-        "m":   rho_func * one * ufl.dx,
-        "mx":  rho_func * x[0] * ufl.dx,
-        "my":  rho_func * x[1] * ufl.dx,
+        "m": rho_func * one * ufl.dx,
+        "mx": rho_func * x[0] * ufl.dx,
+        "my": rho_func * x[1] * ufl.dx,
         "Ixx": rho_func * x[1] ** 2 * ufl.dx,
         "Iyy": rho_func * x[0] ** 2 * ufl.dx,
         "Ixy": rho_func * x[0] * x[1] * ufl.dx,
@@ -55,13 +55,16 @@ def assemble_mass(mesh: Any, rho_func: Any) -> np.ndarray:
     mx, my = vals["mx"], vals["my"]
     Ixx, Iyy, Ixy = vals["Ixx"], vals["Iyy"], vals["Ixy"]
 
-    M = np.array([
-        [ m,    0,    0,    0,    0,   -my],
-        [ 0,    m,    0,    0,    0,    mx],
-        [ 0,    0,    m,    my,  -mx,   0],
-        [ 0,    0,    my,   Ixx, -Ixy,  0],
-        [ 0,    0,   -mx,  -Ixy,  Iyy,  0],
-        [-my,   mx,   0,    0,    0,    Ixx + Iyy],
-    ], dtype=float)
+    M = np.array(
+        [
+            [m, 0, 0, 0, 0, -my],
+            [0, m, 0, 0, 0, mx],
+            [0, 0, m, my, -mx, 0],
+            [0, 0, my, Ixx, -Ixy, 0],
+            [0, 0, -mx, -Ixy, Iyy, 0],
+            [-my, mx, 0, 0, 0, Ixx + Iyy],
+        ],
+        dtype=float,
+    )
     # Symmetrise small numerical drift
     return 0.5 * (M + M.T)

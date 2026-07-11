@@ -1,13 +1,30 @@
-"""Per-cell strain and stress field recovery for unit-load cases.
+"""Per-cell strain and stress field recovery for the Saint-Venant problem.
 
-For each mode i, the total Voigt strain at z = 0 is
+This module provides two related but distinct recoveries:
 
-    eps_total^(i) = eps_z(d_1) + eps_xy(d_2)         [shear: i = 0, 1]
-                  = eps_z(d_0) + eps_xy(d_1)         [other: i = 2..5]
+1. Kinematic basis fields (``recover_strains``)
+   The 6 fields whose total Voigt strains ``eps_total^(i)`` are the ones
+   used internally to build the resultant matrix R and the energy matrix
+   that yield K = R @ inv(S_energy) @ R^T.  These correspond to the unit
+   generalised-strain assumptions (unit ε_zz, unit κ_x, unit κ_y, unit κ_z,
+   plus the bending kinematics that drive the shear chains).
 
-For shear modes the d_1 field is the bending warping (i=4 -> Vx,
-i=3 -> Vy). The "primary warping" Function returned by ``solve`` is
-``d_2`` for shear modes and ``d_1`` for the others.
+2. Applied unit-load fields (``recover_unit_load_strains``)
+   The actual 3D strain/stress distributions that arise under the six
+   *applied unit load cases* [Fx=1, Fy=1, Fz=1, Mx=1, My=1, Mz=1] at the
+   section origin.  These are obtained by inverting the basis-resultant
+   matrix:
+
+       gamma = inv(R) @ e_k
+       eps_k = Σ_i gamma[i] * basis_eps[i]
+       sig_k = Σ_i gamma[i] * basis_sig[i]
+
+   where R is the 6x6 basis-resultant matrix stored on the
+   ``SectionResult``. (``inv(K)`` is the wrong weighting: the chain basis
+   amplitudes are not generalised strains — see solver.py.)
+
+The two sets of fields are related but not identical.  Most engineering
+use cases (fatigue, damage, sub-modelling) want the unit-load version.
 """
 
 from __future__ import annotations
@@ -23,23 +40,75 @@ from .solver import ALL_MODES, STAGE2_MODES
 
 
 class StrainField(BaseModel):
-    """Per-cell Voigt strain and stress for each of the 6 unit-load cases."""
+    """Per-cell Voigt strain and stress for the 6 *kinematic basis* fields.
+
+    These are the fields whose total Voigt strains ``eps_total^(i)`` are the
+    ones used internally by the solver to assemble the resultant matrix R
+    (columns) and the energy matrix (see solver._assemble_resultants and
+    _assemble_energy_matrix).  They correspond one-to-one with the six
+    generalised-strain assumptions (unit axial strain, unit curvatures κ_x/κ_y,
+    unit twist rate κ_z, and the two bending kinematics that drive the shear
+    chains).
+
+    Most users who want "stress under unit Fx / unit Mz ..." should call
+    ``recover_unit_load_strains`` instead.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
-    sigma: np.ndarray    # (6, n_cells, 6) Voigt stress
+    sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
+    cell_areas: np.ndarray  # (n_cells,)
+
+
+class UnitLoadStrainField(BaseModel):
+    """Per-cell Voigt strain and stress for the 6 *applied unit load cases*.
+
+    Ordering matches the 6x6 K: [Fx, Fy, Fz, Mx, My, Mz].
+
+    These fields are the actual 3D strain/stress distributions that arise when
+    a unit force or moment (one of the six standard load cases applied at the
+    section origin) is imposed.  They are obtained from the kinematic basis
+    fields by inverting the basis-resultant matrix R:
+
+        gamma = inv(R) @ e_k
+        eps_k = Sum_i gamma[i] * basis_eps[i]
+        sig_k = Sum_i gamma[i] * basis_sig[i]
+
+    where R is the 6x6 basis-resultant matrix stored on the SectionResult.
+    (inv(K) is the wrong weighting: the chain basis amplitudes are not
+    generalised strains -- see solver.py.)
+
+    The integrated resultants of each of the six recovered fields must
+    recover the corresponding unit load vector (the single strongest
+    verification of the whole pipeline).
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
+    sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     cell_areas: np.ndarray  # (n_cells,)
 
 
 def recover_strains(result: SectionResult) -> StrainField:
-    """Per-cell Voigt strain / stress for each unit-load case."""
+    """Recover per-cell Voigt strain / stress for the 6 kinematic basis fields.
+
+    Returns the six fields whose total Voigt strains ``eps_total^(i)`` are the
+    ones used internally by the solver to build the resultant matrix R (its
+    columns) and the energy matrix that together produce K.  These correspond
+    to the unit generalised-strain assumptions listed in theory.md.
+
+    For the actual strain and stress distributions under the six *applied*
+    unit load cases (Fx=1, Fy=1, Fz=1, Mx=1, My=1, Mz=1) use
+    ``recover_unit_load_strains`` instead.
+    """
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_vector
 
     if result.u_solutions is None or result.C_func is None or result.mesh is None:
-        msg = "result lacks dolfinx state; pass keep_solutions=True to solve()"
+        msg = "result lacks dolfinx state (was it constructed manually?)"
         raise ValueError(msg)
 
     mesh = result.mesh
@@ -93,3 +162,47 @@ def _cell_areas(mesh: Any) -> np.ndarray:
     b = assemble_vector(f)
     b.assemble()
     return b.array.copy()
+
+
+def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
+    """Recover per-cell Voigt strain / stress for the 6 applied unit load cases.
+
+    For each standard load case k (Fx=1, Fy=1, Fz=1, Mx=1, My=1, Mz=1 applied
+    at the section origin) the basis-field amplitudes are
+
+        gamma = inv(R) @ e_k
+
+    where R is the 6x6 basis-resultant matrix stored on the SectionResult
+    (R[a, i] = a-th generalised-force resultant of the i-th chain-basis
+    strain field) and e_k is the k-th unit vector.  The strain and stress
+    fields are then the linear combination of the six kinematic basis fields:
+
+        eps_k = Sum_i gamma[i] * basis_eps[i]
+        sig_k = Sum_i gamma[i] * basis_sig[i]
+
+    The integrated resultants of each of the six recovered fields must
+    reproduce the corresponding unit load vector (within numerical tolerance).
+    This is the single strongest verification of the whole pipeline.
+
+    The returned arrays have shape (6, n_cells, 6) with the same Voigt
+    convention and cell ordering as ``recover_strains``.
+    """
+    if (
+        result.R is None
+        or result.u_solutions is None
+        or result.C_func is None
+        or result.mesh is None
+    ):
+        msg = "result lacks dolfinx state or basis-resultant R (was it constructed manually?)"
+        raise ValueError(msg)
+
+    basis = recover_strains(result)
+    eps_b = basis.epsilon
+    sig_b = basis.sigma
+    areas = basis.cell_areas
+
+    Gamma = np.linalg.solve(result.R, np.eye(6))  # column k = inv(R) @ e_k
+    eps_out = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
+    sig_out = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
+
+    return UnitLoadStrainField(epsilon=eps_out, sigma=sig_out, cell_areas=areas)

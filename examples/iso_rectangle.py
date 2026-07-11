@@ -1,4 +1,7 @@
-"""Isotropic rectangle: smoke-test the b3_secfem 6-unit-load solver."""
+"""Isotropic rectangle: smoke-test the b3_secfem 6-unit-load solver.
+
+Also writes a PNG plot (centres + neutral axes) to examples/example_out/ when run.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ from b3_secfem import (
     IsotropicMaterial,
     RegionMat,
     SectionInput,
+    plot_section,
     solve,
     write_xdmf,
 )
@@ -52,6 +56,13 @@ def main() -> None:
     console.print(f"0.141 G a^4     = {GJ_roark:.3e}     (got K[Mz,Mz] = {res.K[5, 5]:.3e})")
     console.print(f"\nTension centre  = {res.tension_center}")
     console.print(f"Elastic centre  = {res.elastic_center}")
+    console.print(f"Mass centre     = {res.mass_center}")
+
+    # Produce plot showing centres (elastic, shear, mass) + neutral axes
+    out_dir = Path(__file__).parent / "example_out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    png = plot_section(inp, res, out_dir / "iso_rectangle.png", title="Iso rectangle (steel 100x100mm)")
+    console.print(f"Wrote section plot: {png}")
 
 
 if __name__ == "__main__":

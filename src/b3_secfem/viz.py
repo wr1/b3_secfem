@@ -1,13 +1,15 @@
-"""2D-section visualisation: mesh + region tags + centres + principal axes.
+"""2D-section visualisation: mesh + region tags + centres + neutral axes.
 
 Renders a single PNG per section showing:
 
   - The quad mesh (grey edges, lightly filled).
   - Region tags as a discrete colour map (when more than one region is
     present in the SectionInput).
-  - The tension, elastic, and shear centres as labelled markers.
-  - Bending principal axes drawn from the elastic centre, scaled by the
-    relative magnitude of the two principal bending stiffnesses.
+  - The tension (elastic stiffness centroid), mass, and shear centres as
+    labelled markers.
+  - Neutral (principal bending) axes drawn from the tension/elastic centre,
+    scaled by the relative magnitude of the two principal bending stiffnesses
+    (eigenvectors of K[3:5,3:5] sub-block, rotated 90° to align with zero-strain lines).
 
 The plot uses matplotlib only (no PyVista); fast to render and sufficient
 for the 2D output the package targets.
@@ -32,7 +34,7 @@ def plot_section(
     figsize: tuple[float, float] | None = None,
     dpi: int = 140,
 ) -> Path:
-    """Render the section + overlay to ``out_path``. Returns the path."""
+    """Render the section + overlay (centres + neutral axes) to ``out_path``. Returns the path."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -55,11 +57,13 @@ def plot_section(
         figsize = (sec_w + 4.0, sec_h + 0.6)
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
-    sec_w, fig_h = figsize
+    sec_w = figsize[0]
     gs = GridSpec(
-        nrows=1, ncols=2,
+        nrows=1,
+        ncols=2,
         width_ratios=[sec_w - 4.0, 4.0],
-        wspace=0.25, figure=fig,
+        wspace=0.25,
+        figure=fig,
     )
     ax = fig.add_subplot(gs[0, 0])
     ax_legend = fig.add_subplot(gs[0, 1])
@@ -79,7 +83,10 @@ def plot_section(
         cbar.set_ticks(np.unique(region_tags).astype(float))
     else:
         coll = PolyCollection(
-            poly_xy, facecolor="0.85", edgecolor="0.4", linewidth=0.3,
+            poly_xy,
+            facecolor="0.85",
+            edgecolor="0.4",
+            linewidth=0.3,
         )
     ax.add_collection(coll)
 
@@ -93,8 +100,11 @@ def plot_section(
     ax.autoscale_view()
 
     ax_legend.legend(
-        handles, labels,
-        loc="upper left", fontsize=8, framealpha=0.95,
+        handles,
+        labels,
+        loc="upper left",
+        fontsize=8,
+        framealpha=0.95,
         bbox_to_anchor=(0.0, 1.0),
     )
 
@@ -106,29 +116,33 @@ def plot_section(
 
 
 def _draw_overlay(ax, res: SectionResult, nodes, bbox):
-    """Draw centres + principal axes; return matplotlib (handles, labels)."""
+    """Draw centres (elastic/tension, mass, shear) + neutral axes; return matplotlib (handles, labels)."""
     handles = []
     labels = []
 
-    cx, cy = res.tension_center
+    tx, ty = res.tension_center
     sx, sy = res.shear_center
-    ex, ey = res.elastic_center
+    ex, _ey = res.elastic_center
+    mx, my = getattr(res, "mass_center", ex)  # fallback for any legacy result
 
-    if np.isfinite(cx) and np.isfinite(cy):
-        h, = ax.plot([cx], [cy], "o", color="#cc0000", markersize=8,
-                     markeredgecolor="white")
+    if np.isfinite(tx) and np.isfinite(ty):
+        (h,) = ax.plot(
+            [tx], [ty], "o", color="#cc0000", markersize=8, markeredgecolor="white"
+        )
         handles.append(h)
-        labels.append(f"tension ({cx:+.2e}, {cy:+.2e})")
-    if np.isfinite(ex) and np.isfinite(ey):
-        h, = ax.plot([ex], [ey], "s", color="#0044aa", markersize=8,
-                     markeredgecolor="white")
+        labels.append(f"elastic/tension ({tx:+.2e}, {ty:+.2e})")
+    if np.isfinite(mx) and np.isfinite(my):
+        (h,) = ax.plot(
+            [mx], [my], "v", color="#dd6600", markersize=8, markeredgecolor="white"
+        )
         handles.append(h)
-        labels.append(f"elastic ({ex:+.2e}, {ey:+.2e})")
+        labels.append(f"mass ({mx:+.2e}, {my:+.2e})")
     if np.isfinite(sx) and np.isfinite(sy):
-        h, = ax.plot([sx], [sy], "D", color="#117733", markersize=8,
-                     markeredgecolor="white")
+        (h,) = ax.plot(
+            [sx], [sy], "D", color="#117733", markersize=8, markeredgecolor="white"
+        )
         handles.append(h)
-        labels.append(f"shear   ({sx:+.2e}, {sy:+.2e})")
+        labels.append(f"shear ({sx:+.2e}, {sy:+.2e})")
 
     bending_block = res.K[3:5, 3:5]
     if np.all(np.isfinite(bending_block)):
@@ -138,8 +152,9 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
         eigvecs = eigvecs[:, order]
         L = 0.45 * max(bbox[1] - bbox[0], bbox[3] - bbox[2])
         mag = eigvals / eigvals.max()
-        cx_e, cy_e = (ex, ey) if np.isfinite(ex) else (0.0, 0.0)
-        for k, (lam, vec) in enumerate(zip(eigvals, eigvecs.T)):
+        # Neutral axes pass through the tension/elastic (stiffness) centre
+        cx_e, cy_e = (tx, ty) if np.isfinite(tx) else (0.0, 0.0)
+        for k, (lam, vec) in enumerate(zip(eigvals, eigvecs.T, strict=True)):
             ex_dir = np.array([vec[1], -vec[0]])
             ex_dir /= np.linalg.norm(ex_dir)
             half = 0.5 * L * mag[k]
@@ -147,9 +162,9 @@ def _draw_overlay(ax, res: SectionResult, nodes, bbox):
             x1, y1 = cx_e + half * ex_dir[0], cy_e + half * ex_dir[1]
             color = "#222222" if k == 0 else "#666666"
             lw = 2.0 if k == 0 else 1.4
-            h, = ax.plot([x0, x1], [y0, y1], color=color, linewidth=lw)
+            (h,) = ax.plot([x0, x1], [y0, y1], color=color, linewidth=lw)
             handles.append(h)
-            labels.append(f"principal axis {k + 1}\n  EI = {lam:.2e}")
+            labels.append(f"neutral axis {k + 1}\n  EI = {lam:.2e}")
     return handles, labels
 
 
@@ -186,7 +201,12 @@ def _extract_geometry(mesh: Any) -> tuple[np.ndarray, np.ndarray]:
     n_cells = mesh.topology.index_map(cell_dim).size_local
     dofmap = mesh.geometry.dofmap[:n_cells]
     if dofmap.shape[1] != 4:
-        msg = f"plot_section currently supports quad meshes only; got {dofmap.shape[1]}-node cells"
+        msg = (
+            "plot_section / plot_warping currently only support quad meshes "
+            "(4-node cells). Triangular meshes are supported by the solver "
+            "but not yet by the visualizer. Convert your mesh to quads or use "
+            "an external tool (pyvista/paraview) for tris."
+        )
         raise NotImplementedError(msg)
     return nodes, dofmap[:, [0, 2, 3, 1]]
 
@@ -239,9 +259,7 @@ def plot_warping(
     bbox = _bbox(nodes)
     diag = np.hypot(bbox[1] - bbox[0], bbox[3] - bbox[2])
 
-    disp_nodes, mode_label, include_assumed = _evaluate_mode_at_nodes(
-        res, mode, nodes
-    )
+    disp_nodes, mode_label, _include_assumed = _evaluate_mode_at_nodes(res, mode, nodes)
     if scale is None:
         peak_inplane = float(np.max(np.linalg.norm(disp_nodes[:, :2], axis=1)))
         if peak_inplane > 1e-30:
@@ -254,19 +272,28 @@ def plot_warping(
 
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
     poly_orig = nodes[quads]
-    ax.add_collection(PolyCollection(
-        poly_orig, facecolor="none", edgecolor="0.7", linewidth=0.4,
-    ))
+    ax.add_collection(
+        PolyCollection(
+            poly_orig,
+            facecolor="none",
+            edgecolor="0.7",
+            linewidth=0.4,
+        )
+    )
 
     poly_def = deformed[quads]
     cell_uz = u_z[quads].mean(axis=1)
     coll = PolyCollection(
-        poly_def, array=cell_uz, cmap="coolwarm",
-        edgecolor="0.3", linewidth=0.3,
+        poly_def,
+        array=cell_uz,
+        cmap="coolwarm",
+        edgecolor="0.3",
+        linewidth=0.3,
     )
     ax.add_collection(coll)
-    cbar = fig.colorbar(coll, ax=ax, fraction=0.04, pad=0.02,
-                        label="$u_z$ (out-of-plane warping) [m]")
+    fig.colorbar(
+        coll, ax=ax, fraction=0.04, pad=0.02, label="$u_z$ (out-of-plane warping) [m]"
+    )
 
     ax.set_aspect("equal")
     ax.set_xlabel("x [m]")
@@ -303,7 +330,9 @@ def _evaluate_mode_at_nodes(
         ``(0.5 y, 0.5 x, 0)`` so the section visibly shears.
     """
     from dolfinx.geometry import (
-        bb_tree, compute_colliding_cells, compute_collisions_points,
+        bb_tree,
+        compute_colliding_cells,
+        compute_collisions_points,
     )
 
     mesh = res.mesh
@@ -337,13 +366,13 @@ def _evaluate_mode_at_nodes(
 
     warp = res.u_solutions[mode].eval(points_3d, cells_per_pt)
     d0 = np.zeros_like(warp)
-    if mode == 2:           # axial
+    if mode == 2:  # axial
         d0[:, 2] = 1.0
-    elif mode == 3:         # M_x bending
+    elif mode == 3:  # M_x bending
         d0[:, 2] = -nodes[:, 1]
-    elif mode == 4:         # M_y bending
+    elif mode == 4:  # M_y bending
         d0[:, 2] = nodes[:, 0]
-    elif mode == 5:         # M_z torsion
+    elif mode == 5:  # M_z torsion
         d0[:, 0] = -nodes[:, 1]
         d0[:, 1] = nodes[:, 0]
     # Stage-2 shear modes get no kinematic at z = 0; warp is already d_2.

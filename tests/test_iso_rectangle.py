@@ -62,8 +62,8 @@ def test_iso_rectangle_bending_stiffness(tmp_path, iso_steel):
         region_materials={1: RegionMat(material=iso_steel)},
     )
     res = solve(inp)
-    Ixx = a * b ** 3 / 12.0
-    Iyy = b * a ** 3 / 12.0
+    Ixx = a * b**3 / 12.0
+    Iyy = b * a**3 / 12.0
     np.testing.assert_allclose(res.K[3, 3], iso_steel.E * Ixx, rtol=5e-2)
     np.testing.assert_allclose(res.K[4, 4], iso_steel.E * Iyy, rtol=5e-2)
 
@@ -78,7 +78,7 @@ def test_iso_rectangle_torsion_stiffness(tmp_path, iso_steel):
     )
     res = solve(inp)
     G = iso_steel.E / (2 * (1 + iso_steel.nu))
-    GJ_roark = 0.141 * G * a ** 4
+    GJ_roark = 0.141 * G * a**4
     # Roark coefficient is 0.141 for square; coarse mesh gives ~10% error
     np.testing.assert_allclose(res.K[5, 5], GJ_roark, rtol=0.15)
 
@@ -132,7 +132,7 @@ def test_iso_rectangle_K_section_xy(tmp_path, iso_steel):
 
 
 def test_iso_rectangle_centres_at_origin(tmp_path, iso_steel):
-    """Symmetric rectangle has tension and elastic centres at the origin."""
+    """Symmetric rectangle has tension, elastic (mass) and mass centres at the origin."""
     a = b = 0.10
     path, _ = _make_rectangle_xdmf(tmp_path, a, b, 16)
     inp = SectionInput(
@@ -142,3 +142,4 @@ def test_iso_rectangle_centres_at_origin(tmp_path, iso_steel):
     res = solve(inp)
     np.testing.assert_allclose(res.tension_center, (0.0, 0.0), atol=1e-12)
     np.testing.assert_allclose(res.elastic_center, (0.0, 0.0), atol=1e-12)
+    np.testing.assert_allclose(res.mass_center, (0.0, 0.0), atol=1e-12)
