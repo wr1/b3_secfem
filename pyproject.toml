@@ -12,12 +12,12 @@ license = "MIT"
 # `uv venv --system-site-packages` so they remain visible.
 dependencies = [
     "meshio>=5.3",
-    # numpy is pinned <2 to match the ABI of the system (apt) fenics-dolfinx /
-    # petsc4py build, which is compiled against numpy 1.26.x. Installing numpy 2
-    # makes `import dolfinx` fail with a binary-incompatibility ValueError in
-    # petsc4py. (The mfem 4.8 wheel imports fine under numpy 1.26 despite its
-    # declared numba dependency wanting numpy>=2 -- numba is a soft dep here.)
-    "numpy<2",
+    # Standalone fenics/mfem environments need numpy<2 to match the ABI of the
+    # system (apt) fenics-dolfinx / petsc4py build (numpy 1.26.x): re-pin there
+    # with `uv pip install 'numpy<2'` (see Makefile). Unpinned here because the
+    # monorepo workspace needs numpy>=2 (frd2vtu via the CalculiX interface)
+    # and the dolfinx/mfem backends are optional in-workspace.
+    "numpy",
     "pydantic>=2",
     "rich",
     "b3_mat",
@@ -28,7 +28,7 @@ dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit"]
 # airfoilmesh is the sibling ``b3_af`` package (not published to PyPI). The
 # airfoil-section tests skip when it is absent, so it is opt-in: install with
 # ``pip install -e ../b3_af`` (see Makefile) to exercise them locally.
-airfoil = ["airfoilmesh"]
+airfoil = ["b3_af"]
 # Install with: uv pip install --only-binary=:all: 'mfem>=4.8'  (only the 4.8
 # wheels are published for cp312; older versions are sdist-only and need a
 # native MFEM toolchain). Then re-pin numpy: uv pip install 'numpy<2'.
