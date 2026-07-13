@@ -17,6 +17,24 @@ orthotropic rectangles (see tests/test_backend_comparison.py).
 Not yet ported: strain/stress field recovery (``recover_strains``) and the
 input-cell-order remap needed for ``per_cell_material`` on dolfinx-renumbered
 meshes (region-tagged and uniform sections are fine).
+
+**Cannot yet read a laminate section mesh (2026-07-13).** MFEM's XDMF reader takes
+only a single grid::
+
+    Error: Couldn't read file .../section.xdmf as xdmf
+    XDMF reader: Only supports one grid right now.
+
+``b3_af.afmesh`` writes one grid per region tag (one per unique material+angle pair),
+so every real blade section is multi-grid and this backend rejects it outright. It
+therefore cannot currently stand in for fenicsx in ``b3_invsec`` — which was the reason
+to want it, since fenicsx's FFCx JIT makes each worker process heavy to start.
+
+To make it usable, in rough order of effort:
+  1. multi-grid XDMF read (or read the mesh once and apply cell tags separately);
+  2. ``recover_strains`` — ``b3_invsec.evaluate`` needs the 7 unit-load strain fields,
+     not just K/M.
+Until (1) and (2) land, ``solve(inp, backend="mfem")`` works only on single-region
+meshes.
 """
 
 from __future__ import annotations
