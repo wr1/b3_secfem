@@ -228,6 +228,122 @@ def run_full_comparison(mat_key: str = "iso", nx: int = 12, ny: int = 8) -> dict
 
 
 # ---------------------------------------------------------------------------
+# Strain recovery: recover the 6 basis fields per backend, compare per-cell
+# (cells matched by centroid — the two engines order cells differently)
+# ---------------------------------------------------------------------------
+
+_STRAIN_WORKER = r"""
+import json, sys, time
+import numpy as np
+
+mat_key, mesh_path, backend, out_npz = sys.argv[1:5]
+
+from b3_secfem.bench import MATERIALS
+from b3_secfem import (IsotropicMaterial, OrthotropicMaterial, RegionMat,
+                       SectionInput, solve, recover_strains,
+                       recover_unit_load_strains)
+
+spec = MATERIALS[mat_key]
+if spec["kind"] == "iso":
+    mat = IsotropicMaterial(E=spec["E"], nu=spec["nu"], rho=spec["rho"])
+else:
+    mat = OrthotropicMaterial(**{k: v for k, v in spec.items() if k != "kind"})
+
+inp = SectionInput(mesh_path=mesh_path,
+                   region_materials={1: RegionMat(material=mat)},
+                   degree=2, backend=backend)
+
+res = solve(inp)
+t0 = time.perf_counter()
+basis = recover_strains(res)
+unit = recover_unit_load_strains(res)
+t1 = time.perf_counter()
+
+if backend == "mfem":
+    import mfem.ser as mfem
+    m = res.mesh
+    c = np.zeros((m.GetNE(), 2))
+    v = mfem.Vector(2)
+    for e in range(m.GetNE()):
+        m.GetElementCenter(e, v)
+        c[e] = v.GetDataArray()[:2]
+else:
+    from dolfinx import mesh as dmesh
+    m = res.mesh
+    dim = m.topology.dim
+    n = m.topology.index_map(dim).size_local
+    c = dmesh.compute_midpoints(m, dim, np.arange(n, dtype=np.int32))[:, :2]
+
+np.savez(out_npz, eps=basis.epsilon, sig=basis.sigma,
+         eps_unit=unit.epsilon, sig_unit=unit.sigma,
+         areas=basis.cell_areas, centroids=c)
+print(json.dumps({"backend": backend, "recover_s": t1 - t0,
+                  "n_cells": int(basis.epsilon.shape[1])}))
+"""
+
+
+def strain_solve_in_subprocess(
+    backend: str, mesh_path: str | Path, mat_key: str, out_npz: str | Path
+) -> dict:
+    """Solve + recover strain fields for one backend in an isolated subprocess."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _STRAIN_WORKER, mat_key, str(mesh_path),
+         backend, str(out_npz)],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"{backend} strain worker failed (rc={proc.returncode}):\n"
+            f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+        )
+    lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    return json.loads(lines[-1])
+
+
+def run_strain_comparison(mat_key: str = "iso", nx: int = 12, ny: int = 8) -> dict:
+    """Recover the basis + unit-load strain fields with both backends on one
+    mesh and diff them per cell (matched by centroid).
+
+    Returns ``{"fenicsx": meta, "mfem": meta, "compare": {...}}`` where the
+    compare block holds max relative field differences (scaled by the field's
+    max magnitude) for basis/unit epsilon and sigma, plus the max centroid
+    matching distance (sanity: must be ~0).
+    """
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        mesh_xdmf = td / "mesh.xdmf"
+        make_rectangle_xdmf(mesh_xdmf, nx=nx, ny=ny)
+        fen_meta = strain_solve_in_subprocess(
+            "fenicsx", mesh_xdmf, mat_key, td / "fen.npz")
+        mf_meta = strain_solve_in_subprocess(
+            "mfem", mesh_xdmf, mat_key, td / "mf.npz")
+        fen = dict(np.load(td / "fen.npz"))
+        mf = dict(np.load(td / "mf.npz"))
+
+    # Match mfem cells to fenicsx cells by centroid (nearest neighbour).
+    d2 = (
+        (fen["centroids"][:, None, :] - mf["centroids"][None, :, :]) ** 2
+    ).sum(axis=2)
+    perm = np.argmin(d2, axis=1)
+    match_dist = float(np.sqrt(d2[np.arange(len(perm)), perm].max()))
+
+    def rel(a, b):
+        scale = max(np.abs(a).max(), np.abs(b).max(), 1e-300)
+        return float(np.abs(a - b).max() / scale)
+
+    cmp = {
+        "centroid_match_dist": match_dist,
+        "eps_rel": rel(fen["eps"], mf["eps"][:, perm, :]),
+        "sig_rel": rel(fen["sig"], mf["sig"][:, perm, :]),
+        "eps_unit_rel": rel(fen["eps_unit"], mf["eps_unit"][:, perm, :]),
+        "sig_unit_rel": rel(fen["sig_unit"], mf["sig_unit"][:, perm, :]),
+        "areas_rel": rel(fen["areas"], mf["areas"][perm]),
+    }
+    return {"fenicsx": fen_meta, "mfem": mf_meta, "compare": cmp}
+
+
+# ---------------------------------------------------------------------------
 # Mesh generation (dolfinx, written to XDMF both backends can read)
 # ---------------------------------------------------------------------------
 

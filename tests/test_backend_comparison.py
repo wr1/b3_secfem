@@ -84,6 +84,27 @@ def test_full_solve_matches_fenicsx(mat_key):
     assert c["shear_center_absdiff"] < 1e-8, c
 
 
+@pytest.mark.parametrize("mat_key", ["iso", "ortho"])
+def test_strain_recovery_matches_fenicsx(mat_key):
+    """mfem's recovered basis + unit-load strain fields equal fenicsx's.
+
+    Per-cell comparison with cells matched by centroid (the two engines
+    number cells differently). Both recoveries are DG0 cell averages of the
+    same continuous solution fields, so agreement tracks the solve agreement
+    (~1e-8 on K).
+    """
+    from b3_secfem.bench import run_strain_comparison
+
+    res = run_strain_comparison(mat_key, nx=12, ny=8)
+    c = res["compare"]
+    assert c["centroid_match_dist"] < 1e-9, c
+    assert c["areas_rel"] < 1e-10, c
+    assert c["eps_rel"] < 1e-6, c
+    assert c["sig_rel"] < 1e-6, c
+    assert c["eps_unit_rel"] < 1e-6, c
+    assert c["sig_unit_rel"] < 1e-6, c
+
+
 def test_mfem_rectangle_matches_closed_form():
     """mfem K/M on a centred rectangle match the analytic beam values.
 

@@ -415,22 +415,69 @@ def solve(inp: SectionInput) -> SectionResult:
         K_section_xy=K_section_xy,
         u_solutions=u_solutions,
         inplane_shear_warping=w_xy,
-        C_func=None,
+        # Backend-specific recovery payload (the documented use of C_func):
+        # exactly the strain-field specs that built R, so recover_strains
+        # reproduces the R-consistent basis fields by construction.
+        C_func={
+            "C_per_cell": C_per_cell,
+            "fes": fes,
+            "a_dofs": a_dofs,
+            "b_dofs": b_dofs,
+        },
         mesh=mesh,
         backend="mfem",
     )
 
 
 def recover_strains(result: SectionResult):
+    """Per-cell Voigt strain/stress for the 6 kinematic basis fields (mfem).
+
+    Mirrors ``recovery.recover_strains`` (fenicsx): each field i is the
+    cell-averaged (DG0) total strain ``eps_total^(i) = eps_z(a_i) +
+    eps_xy(b_i)`` — the same integrand ``_assemble_R_S`` used to build R,
+    evaluated with the same quadrature, so the recovered fields are
+    R-consistent by construction. Returns ``StrainField`` with
+    epsilon/sigma of shape (6, n_cells, 6) in mfem element order (== input
+    cell order; ``_load_mfem_mesh`` preserves it).
+    """
+    from ..recovery import StrainField
+
     if getattr(result, "backend", "") != "mfem":
         raise ValueError("recover_strains called on non-mfem result")
-    raise NotImplementedError(
-        "mfem strain/stress field recovery is not ported yet (K/M/centres are). "
-        "Use the fenicsx backend for recover_strains / recover_unit_load_strains."
-    )
+    state = result.C_func
+    if not isinstance(state, dict) or "a_dofs" not in state:
+        raise ValueError(
+            "result lacks mfem recovery state (was it constructed manually?)"
+        )
+    mesh = result.mesh
+    fes = state["fes"]
+    C_per_cell = state["C_per_cell"]
+    a_dofs = state["a_dofs"]
+    b_dofs = state["b_dofs"]
 
+    n_cells = mesh.GetNE()
+    eps = np.zeros((6, n_cells, 6))
+    sig = np.zeros((6, n_cells, 6))
+    areas = np.zeros(n_cells)
 
-# (identical pattern for recover_unit_load_strains, the two plot helpers, etc.)
+    for e in range(n_cells):
+        acc = np.zeros((6, 6))  # (mode, voigt)
+        area = 0.0
+        for w, _x, _y, dN, N, idx, sign in _iter_quad(mesh, fes, e):
+            Bxy = _voigt_strain_from_dshape(dN)
+            Bz = _voigt_epsz_from_shape(N)
+            for i in range(6):
+                acc[i] += (
+                    Bz @ (sign * a_dofs[i][idx]) + Bxy @ (sign * b_dofs[i][idx])
+                ) * w
+            area += w
+        eps[:, e, :] = acc / area
+        areas[e] = area
+        C_local = C_per_cell[e]
+        for i in range(6):
+            sig[i, e, :] = C_local @ eps[i, e, :]
+
+    return StrainField(epsilon=eps, sigma=sig, cell_areas=areas)
 
 
 def assemble_stiffness_matrix(

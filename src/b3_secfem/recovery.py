@@ -102,7 +102,15 @@ def recover_strains(result: SectionResult) -> StrainField:
     For the actual strain and stress distributions under the six *applied*
     unit load cases (Fx=1, Fy=1, Fz=1, Mx=1, My=1, Mz=1) use
     ``recover_unit_load_strains`` instead.
+
+    Dispatches on ``result.backend``: mfem results route to the mfem
+    backend's own recovery (same contract, same cell ordering semantics).
     """
+    if getattr(result, "backend", "fenicsx") == "mfem":
+        from .backends import mfem as _mfem_backend
+
+        return _mfem_backend.recover_strains(result)
+
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_vector
