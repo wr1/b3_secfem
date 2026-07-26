@@ -26,6 +26,7 @@ examples/deformed_out/
 examples/cross_check_out/
 examples/example_out/
 examples/airfoil_stress_out/
+examples/mfem_strain_out/
 *.npz
 
 # Editor / tool state
