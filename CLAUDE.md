@@ -1,1 +1,1 @@
-@notes/claude.md
+@../../CLAUDE.md
