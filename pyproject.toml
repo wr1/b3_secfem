@@ -12,12 +12,7 @@ license = "MIT"
 # `uv venv --system-site-packages` so they remain visible.
 dependencies = [
     "meshio>=5.3",
-    # numpy is pinned <2 to match the ABI of the system (apt) fenics-dolfinx /
-    # petsc4py build, which is compiled against numpy 1.26.x. Installing numpy 2
-    # makes `import dolfinx` fail with a binary-incompatibility ValueError in
-    # petsc4py. (The mfem 4.8 wheel imports fine under numpy 1.26 despite its
-    # declared numba dependency wanting numpy>=2 -- numba is a soft dep here.)
-    "numpy<2",
+    "numpy",
     "pydantic>=2",
     "rich",
 ]
