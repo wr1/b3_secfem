@@ -166,7 +166,14 @@ def _load_mfem_mesh(inp: SectionInput) -> tuple[Any, np.ndarray | None, int]:
         if key in cell_data:
             arr = cell_data[key]
             if isinstance(arr, dict):
-                arr = arr.get(ctype) or next(iter(arr.values()), None)
+                # `a or b` truth-tests the array and raises for len > 1, so the
+                # fallback has to be an explicit None check. meshio keys this
+                # dict by cell type ("quad"), but the writer may have used
+                # "quadrilateral" — take the sole block when the key misses.
+                picked = arr.get(ctype)
+                if picked is None:
+                    picked = next(iter(arr.values()), None)
+                arr = picked
             if arr is not None:
                 tags = np.asarray(arr, dtype=np.int32)[:n_cells]
                 break
@@ -478,6 +485,75 @@ def recover_strains(result: SectionResult):
             sig[i, e, :] = C_local @ eps[i, e, :]
 
     return StrainField(epsilon=eps, sigma=sig, cell_areas=areas)
+
+
+def recover_inplane_shear_strain(result: SectionResult):
+    """Per-cell Voigt strain/stress for the 7th (in-plane shear) case (mfem).
+
+    The 6 kinematic basis fields come from ``recover_strains``; this is the
+    separate unit in-plane engineering shear, whose warping field the solve
+    already produced as ``result.inplane_shear_warping``.
+
+    Same cell-averaged (DG0) integrand and quadrature as ``recover_strains``
+    and as ``_inplane_shear`` itself, so all seven load cases share one Voigt
+    convention and one cell ordering — which is what lets a caller stack them.
+
+    Returns ``(epsilon, sigma, cell_areas)`` with epsilon/sigma of shape
+    ``(n_cells, 6)``, matching the fenicsx routine of the same name.
+    """
+    if getattr(result, "backend", "") != "mfem":
+        raise ValueError("recover_inplane_shear_strain called on non-mfem result")
+    state = result.C_func
+    if not isinstance(state, dict) or "fes" not in state:
+        raise ValueError("result lacks mfem recovery state")
+    if result.inplane_shear_warping is None:
+        raise ValueError("result lacks the in-plane-shear warping field")
+
+    mesh = result.mesh
+    fes = state["fes"]
+    C_per_cell = state["C_per_cell"]
+    w_xy = np.asarray(result.inplane_shear_warping)
+
+    eps_a = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+    n_cells = mesh.GetNE()
+    eps = np.zeros((n_cells, 6))
+    sig = np.zeros((n_cells, 6))
+    areas = np.zeros(n_cells)
+
+    for e in range(n_cells):
+        acc = np.zeros(6)
+        area = 0.0
+        for w, _x, _y, dN, _N, idx, sign in _iter_quad(mesh, fes, e):
+            acc += (eps_a + _voigt_strain_from_dshape(dN) @ (sign * w_xy[idx])) * w
+            area += w
+        eps[e] = acc / area
+        areas[e] = area
+        sig[e] = C_per_cell[e] @ eps[e]
+
+    # The warping field must actually relieve the assumed strain. Measured
+    # against fenicsx on an IEA-22 section, this backend's w_xy contributes
+    # ~1e-11 of strain where fenicsx contributes ~7e-3, so the recovered field
+    # collapses to the bare assumed strain (0,0,0,0,0,1).
+    #
+    # K_section_xy still agrees to 0.06% because the relief enters the energy
+    # at second order — so the scalar cannot detect this, and a caller reading
+    # per-cell strain gets a silently wrong answer (a Vxy reserve factor out by
+    # seven orders). Refuse rather than return it.
+    relief = float(np.abs(eps[:, :5]).max())
+    if relief < 1e-8:
+        msg = (
+            "mfem in-plane-shear warping carries no per-cell strain "
+            f"(max |eps| over the non-shear components = {relief:.2e}); the "
+            "recovered field is the bare assumed strain, which would understate "
+            "the shear demand by orders of magnitude.\n"
+            "  The 7th-case warping solve in _inplane_shear needs fixing before "
+            "this recovery can be trusted; K_section_xy agrees with fenicsx to "
+            "0.06% and so does NOT catch it.\n"
+            "  Use the fenicsx backend for per-cell 7th-load-case recovery."
+        )
+        raise NotImplementedError(msg)
+
+    return eps, sig, areas
 
 
 def assemble_stiffness_matrix(
