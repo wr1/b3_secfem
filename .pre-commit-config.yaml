@@ -1,18 +1,28 @@
-# Pre-commit linting/formatting with ruff. Install once with:
-#   pre-commit install
-# Run across the whole repo with:
+# Pre-commit: ruff lint + format. Install once:
+#   pip install pre-commit && pre-commit install
+# Run all files:
 #   pre-commit run --all-files
-# Config (rules, line length, per-file ignores) lives in pyproject.toml.
-# Scoped to src/ + tests/ to match `make lint` (examples/ are demo scripts
-# kept out of the lint gate).
+# Or: make pre-commit
+#
+# Rule config lives in pyproject.toml. Scoped to src/ + tests/ (matches
+# `make lint`; examples/ stay out of the gate).
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.14
     hooks:
-      # Lint, auto-fixing what is safely fixable.
       - id: ruff-check
         args: [--fix]
         files: ^(src|tests)/
-      # Then format.
       - id: ruff-format
         files: ^(src|tests)/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^(src|tests|README\.md|pyproject\.toml)$
+      - id: end-of-file-fixer
+        files: ^(src|tests|README\.md|pyproject\.toml)$
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=500]

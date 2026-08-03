@@ -1,5 +1,11 @@
 # b3_secfem
 
+[![CI](https://github.com/wr1/b3_secfem/actions/workflows/ci.yml/badge.svg)](https://github.com/wr1/b3_secfem/actions/workflows/ci.yml)
+[![Release](https://github.com/wr1/b3_secfem/actions/workflows/release.yml/badge.svg)](https://github.com/wr1/b3_secfem/actions/workflows/release.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Lightweight FEniCSx-based 2D cross-section property solver for composite
 wing / wind-turbine-blade sections.
 
@@ -87,6 +93,19 @@ Many medium jobs (e.g. surrogate sweeps) care about **warm** wall time and
 (K/M/centres), `time_backends` / `profile_*`. Each backend in its own subprocess
 (dolfinx + mfem teardown is unsafe in one process). See
 `tests/test_backend_comparison.py`, `examples/compare_backends.py`.
+
+## Develop / CI
+
+```bash
+pre-commit install          # ruff lint + format on commit
+make lint && make format    # same tools via Makefile
+make test-pure              # no dolfinx (matches CI unit job)
+make test                   # full suite (needs fenicsx env — see Makefile)
+```
+
+Release: tag `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) → GitHub
+Actions builds sdist/wheel and creates a Release. PyPI publish is optional
+(OIDC stub in `.github/workflows/release.yml`).
 
 ## v0.1 limitations
 

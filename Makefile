@@ -19,16 +19,17 @@
 MAMBA_ENV ?= b3secfem
 MAMBA_RUN ?= micromamba run -n $(MAMBA_ENV)
 
-.PHONY: help install test test-pure lint format check clean install-venv
+.PHONY: help install test test-pure lint format pre-commit check clean install-venv
 
 help:
 	@echo "b3_secfem developer targets:"
 	@echo ""
 	@echo "  make install      - editable-install b3_mat, airfoilmesh, b3_secfem[dev] into the '$(MAMBA_ENV)' env (run once)"
 	@echo "  make test         - run the full test suite (requires prior 'make install')"
-	@echo "  make test-pure    - run only the pure-Python tests (no dolfinx needed)"
-	@echo "  make lint         - run ruff linter"
-	@echo "  make format       - run ruff formatter"
+	@echo "  make test-pure    - pure-Python tests only (no dolfinx; matches CI)"
+	@echo "  make lint         - ruff check"
+	@echo "  make format       - ruff format"
+	@echo "  make pre-commit   - pre-commit run --all-files (ruff + basic hooks)"
 	@echo "  make check        - lint + full test suite + unit-load recovery smoke test"
 	@echo "  make clean        - remove caches and the legacy uv venv"
 	@echo "  make install-venv - legacy: build a uv venv with --system-site-packages (fragile, see header)"
@@ -36,6 +37,7 @@ help:
 install:
 	@echo "==> Installing local b3_mat + airfoilmesh (siblings) + b3_secfem[dev] into '$(MAMBA_ENV)'"
 	$(MAMBA_RUN) pip install -e ../b3_mat -e ../b3_af -e ".[dev]"
+	$(MAMBA_RUN) pre-commit install || true
 
 test:
 	$(MAMBA_RUN) python -m pytest -q --tb=short
@@ -50,12 +52,12 @@ lint:
 format:
 	$(MAMBA_RUN) ruff format src tests
 
-# Pre-commit gate: lint, test suite, and the airfoil unit-load recovery
-# example whose final algebraic identity ||R @ Gamma - I||_inf must be at
-# machine precision (asserts the recover_unit_load_strains formula).
+pre-commit:
+	$(MAMBA_RUN) pre-commit run --all-files
+
+# Local gate: lint, test suite, and airfoil unit-load recovery smoke.
 check: lint test
 	$(MAMBA_RUN) python examples/airfoil_unit_load_stress.py
-
 clean:
 	rm -rf .venv .ruff_cache .pytest_cache __pycache__ */__pycache__
 	find . -name '*.pyc' -delete 2>/dev/null || true
