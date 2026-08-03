@@ -287,8 +287,15 @@ def strain_solve_in_subprocess(
 ) -> dict:
     """Solve + recover strain fields for one backend in an isolated subprocess."""
     proc = subprocess.run(
-        [sys.executable, "-c", _STRAIN_WORKER, mat_key, str(mesh_path),
-         backend, str(out_npz)],
+        [
+            sys.executable,
+            "-c",
+            _STRAIN_WORKER,
+            mat_key,
+            str(mesh_path),
+            backend,
+            str(out_npz),
+        ],
         capture_output=True,
         text=True,
     )
@@ -315,16 +322,14 @@ def run_strain_comparison(mat_key: str = "iso", nx: int = 12, ny: int = 8) -> di
         mesh_xdmf = td / "mesh.xdmf"
         make_rectangle_xdmf(mesh_xdmf, nx=nx, ny=ny)
         fen_meta = strain_solve_in_subprocess(
-            "fenicsx", mesh_xdmf, mat_key, td / "fen.npz")
-        mf_meta = strain_solve_in_subprocess(
-            "mfem", mesh_xdmf, mat_key, td / "mf.npz")
+            "fenicsx", mesh_xdmf, mat_key, td / "fen.npz"
+        )
+        mf_meta = strain_solve_in_subprocess("mfem", mesh_xdmf, mat_key, td / "mf.npz")
         fen = dict(np.load(td / "fen.npz"))
         mf = dict(np.load(td / "mf.npz"))
 
     # Match mfem cells to fenicsx cells by centroid (nearest neighbour).
-    d2 = (
-        (fen["centroids"][:, None, :] - mf["centroids"][None, :, :]) ** 2
-    ).sum(axis=2)
+    d2 = ((fen["centroids"][:, None, :] - mf["centroids"][None, :, :]) ** 2).sum(axis=2)
     perm = np.argmin(d2, axis=1)
     match_dist = float(np.sqrt(d2[np.arange(len(perm)), perm].max()))
 
@@ -475,5 +480,173 @@ def format_timing_table(rows: list[dict]) -> str:
         lines.append(
             f"{r['n_cells']:>7} {r['ndof']:>8} {r['fenicsx_s']:>13.4f} "
             f"{r['mfem_s']:>12.4f} {r['ratio_mfem_over_fenicsx']:>13.2f}"
+        )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# End-to-end wall timing (warm / cold, solver variants) — invsec-relevant
+# ---------------------------------------------------------------------------
+
+_PROFILE_WORKER = r"""
+import json, sys, time
+import numpy as np
+
+mesh_path, backend, linear_solver, n_warm, do_recover = sys.argv[1:6]
+n_warm = int(n_warm)
+do_recover = do_recover == "1"
+
+t_import0 = time.perf_counter()
+from b3_secfem import (
+    IsotropicMaterial, RegionMat, SectionInput, solve, recover_strains,
+    recover_unit_load_strains,
+)
+t_import1 = time.perf_counter()
+
+mat = IsotropicMaterial(E=100e9, nu=0.3, rho=2000.0)
+kwargs = dict(
+    mesh_path=mesh_path,
+    region_materials={1: RegionMat(material=mat)},
+    degree=2,
+    backend=backend,
+)
+if backend == "fenicsx":
+    kwargs["linear_solver"] = linear_solver
+inp = SectionInput(**kwargs)
+
+times_solve = []
+times_recover = []
+K_ref = None
+for i in range(n_warm + 1):
+    t0 = time.perf_counter()
+    res = solve(inp)
+    t1 = time.perf_counter()
+    times_solve.append(t1 - t0)
+    if do_recover:
+        t2 = time.perf_counter()
+        recover_strains(res)
+        recover_unit_load_strains(res)
+        t3 = time.perf_counter()
+        times_recover.append(t3 - t2)
+    if i == 0:
+        K_ref = res.K.copy()
+    elif K_ref is not None:
+        # keep last K for sanity; do not fail the worker on tiny noise
+        pass
+
+print(json.dumps({
+    "backend": backend,
+    "linear_solver": linear_solver if backend == "fenicsx" else "kkt",
+    "import_s": t_import1 - t_import0,
+    "solve_cold_s": times_solve[0],
+    "solve_warm_s": min(times_solve[1:]) if len(times_solve) > 1 else times_solve[0],
+    "solve_all_s": times_solve,
+    "recover_cold_s": times_recover[0] if times_recover else None,
+    "recover_warm_s": (min(times_recover[1:]) if len(times_recover) > 1 else times_recover[0])
+                      if times_recover else None,
+    "K_diag": np.diag(res.K).tolist(),
+}))
+"""
+
+
+def profile_solve(
+    backend: str = "fenicsx",
+    *,
+    nx: int = 24,
+    ny: int = 16,
+    linear_solver: str = "gamg",
+    n_warm: int = 2,
+    recover: bool = True,
+    mesh_path: str | Path | None = None,
+) -> dict:
+    """Time import + cold/warm full solve (+ optional recovery) in a fresh process.
+
+    Designed for the invsec-style question: how much of wall time is cold start
+    vs the steady-state solve once forms / factors are hot. Returns a meta dict
+    with ``import_s``, ``solve_cold_s``, ``solve_warm_s``, and optional recover
+    fields. The mesh is a rectangle unless ``mesh_path`` is given.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        if mesh_path is None:
+            mesh_xdmf = td / "mesh.xdmf"
+            make_rectangle_xdmf(mesh_xdmf, nx=nx, ny=ny)
+        else:
+            mesh_xdmf = Path(mesh_path)
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                _PROFILE_WORKER,
+                str(mesh_xdmf),
+                backend,
+                linear_solver,
+                str(n_warm),
+                "1" if recover else "0",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"profile worker failed (rc={proc.returncode}):\n"
+            f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+        )
+    lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    return json.loads(lines[-1])
+
+
+def profile_matrix(
+    sizes: list[tuple[int, int]] | None = None,
+    *,
+    linear_solvers: list[str] | None = None,
+    recover: bool = True,
+    n_warm: int = 2,
+) -> list[dict]:
+    """Cold/warm solve table across mesh sizes and fenicsx solver choices + mfem.
+
+    Each cell is a fresh subprocess (realistic for spawn workers' *first* job;
+    warm numbers inside that process approximate later jobs on a reused worker).
+    """
+    sizes = sizes or [(12, 8), (24, 16), (48, 32)]
+    linear_solvers = linear_solvers or ["gamg", "lu", "ilu"]
+    rows: list[dict] = []
+    for nx, ny in sizes:
+        for be, ls in [("mfem", "kkt")] + [("fenicsx", s) for s in linear_solvers]:
+            meta = profile_solve(
+                be, nx=nx, ny=ny, linear_solver=ls, n_warm=n_warm, recover=recover
+            )
+            rows.append(
+                {
+                    "nx": nx,
+                    "ny": ny,
+                    "backend": be,
+                    "linear_solver": meta["linear_solver"],
+                    "import_s": meta["import_s"],
+                    "solve_cold_s": meta["solve_cold_s"],
+                    "solve_warm_s": meta["solve_warm_s"],
+                    "recover_warm_s": meta.get("recover_warm_s"),
+                    "end_to_end_warm_s": meta["solve_warm_s"]
+                    + (meta.get("recover_warm_s") or 0.0),
+                }
+            )
+    return rows
+
+
+def format_profile_table(rows: list[dict]) -> str:
+    """Render :func:`profile_matrix` rows as a fixed-width text table."""
+    head = (
+        f"{'mesh':>9} {'backend':>8} {'solver':>6} {'import':>8} "
+        f"{'cold':>8} {'warm':>8} {'recov':>8} {'e2e_w':>8}"
+    )
+    lines = [head, "-" * len(head)]
+    for r in rows:
+        mesh = f"{r['nx']}x{r['ny']}"
+        rec = r.get("recover_warm_s")
+        rec_s = f"{rec:8.3f}" if rec is not None else f"{'—':>8}"
+        lines.append(
+            f"{mesh:>9} {r['backend']:>8} {r['linear_solver']:>6} "
+            f"{r['import_s']:8.3f} {r['solve_cold_s']:8.3f} "
+            f"{r['solve_warm_s']:8.3f} {rec_s} {r['end_to_end_warm_s']:8.3f}"
         )
     return "\n".join(lines)

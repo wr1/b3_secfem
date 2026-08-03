@@ -96,7 +96,6 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_matrix
-    from petsc4py import PETSc
 
     mesh, cell_tags = _load_mesh(inp)
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -139,12 +138,7 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     A.setNullSpace(nullspace)
     A.setNearNullSpace(nullspace)
 
-    ksp = PETSc.KSP().create(mesh.comm)
-    ksp.setOperators(A)
-    ksp.setType("cg")
-    pc = ksp.getPC()
-    pc.setType("gamg")
-    ksp.setTolerances(rtol=1e-10, atol=1e-14, max_it=2000)
+    ksp = _make_ksp(A, mesh.comm, inp.linear_solver)
 
     x = ufl.SpatialCoordinate(mesh)
 
@@ -247,6 +241,47 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
         C_func=C_func,
         mesh=mesh,
     )
+
+
+def _make_ksp(A: Any, comm: Any, linear_solver: str) -> Any:
+    """Build a PETSc KSP for the singular in-plane operator E.
+
+    ``linear_solver`` (from ``SectionInput``):
+      - ``gamg``: CG + smoothed-aggregation GAMG (good for large systems;
+        setup-heavy on medium invsec sections).
+      - ``lu``:   PREONLY + LU with a small nonzero shift so the 4-D rigid
+        kernel does not make the factor singular. Fast factor + apply for
+        medium 2D sizes; preferred when many independent medium jobs run
+        under a wall-clock budget.
+      - ``ilu``:  CG + ILU(0). Cheap setup, more iterations than GAMG on
+        large meshes; a middle ground for medium sections without a full
+        direct factor.
+    """
+    from petsc4py import PETSc
+
+    ksp = PETSc.KSP().create(comm)
+    ksp.setOperators(A)
+    pc = ksp.getPC()
+    if linear_solver == "lu":
+        # Direct factor. E is SPSD with a 4-D kernel; a tiny diagonal shift
+        # makes the factor well-defined while nullspace.remove keeps RHS
+        # orthogonal to ker(E), so the solution stays in the physical range.
+        ksp.setType(PETSc.KSP.Type.PREONLY)
+        pc.setType(PETSc.PC.Type.LU)
+        try:
+            pc.setFactorSolverType("mumps")
+        except Exception:  # mumps not built into this PETSc -- use default LU
+            pass
+        pc.setFactorShift(PETSc.Mat.FactorShiftType.NONZERO, 1e-10)
+    elif linear_solver == "ilu":
+        ksp.setType(PETSc.KSP.Type.CG)
+        pc.setType(PETSc.PC.Type.ILU)
+        ksp.setTolerances(rtol=1e-10, atol=1e-14, max_it=2000)
+    else:  # gamg (default)
+        ksp.setType(PETSc.KSP.Type.CG)
+        pc.setType(PETSc.PC.Type.GAMG)
+        ksp.setTolerances(rtol=1e-10, atol=1e-14, max_it=2000)
+    return ksp
 
 
 def _solve_with_nullspace(

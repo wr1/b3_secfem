@@ -306,9 +306,15 @@ if _MFEM_AVAILABLE:
                 Bu = self._operator(el, trans, ip, self.trial_kind, dref, dphys, shp)
                 acc += (Bt.T @ (C_local @ Bu)) * w
 
-            for r in range(vdim * ndof):
-                for c in range(vdim * ndof):
-                    elmat[r, c] = acc[r, c]
+            # Bulk write into MFEM DenseMatrix. GetDataArray is a (H, W) view
+            # (column-major storage under the hood); assigning the whole block
+            # avoids an O(ndof^2) pure-Python double loop on every element.
+            view = elmat.GetDataArray()
+            if getattr(view, "shape", None) == acc.shape:
+                view[:, :] = acc
+            else:
+                flat = np.asarray(view).reshape(-1, order="F")
+                flat[:] = acc.ravel(order="F")
 
     class StiffnessIntegrator(_VoigtFormIntegrator):
         """In-plane stiffness ∫ eps_xy(v)^T C eps_xy(u) dA (the E operator)."""
@@ -368,10 +374,20 @@ def solve(inp: SectionInput) -> SectionResult:
     fec = mfem.H1_FECollection(inp.degree, mesh.Dimension())
     fes = mfem.FiniteElementSpace(mesh, fec, 3)
 
-    # Section operators (one integrator, three operator pairs).
-    E = _assemble_voigt_form(C_per_cell, fes, "xy", "xy").tocsc()
-    Cmat = _assemble_voigt_form(C_per_cell, fes, "xy", "z").tocsc()
-    Mmat = _assemble_voigt_form(C_per_cell, fes, "z", "z").tocsc()
+    # Section operators. Bulk path tabulates geometry once and reuses for all three.
+    from .bulk_assemble import resolve_assemble_mode, tabulate_fes
+
+    mode = resolve_assemble_mode()
+    tables = tabulate_fes(mesh, fes) if mode != "python" else None
+    E = _assemble_voigt_form(
+        C_per_cell, fes, "xy", "xy", mesh=mesh, tables=tables, mode=mode
+    ).tocsc()
+    Cmat = _assemble_voigt_form(
+        C_per_cell, fes, "xy", "z", mesh=mesh, tables=tables, mode=mode
+    ).tocsc()
+    Mmat = _assemble_voigt_form(
+        C_per_cell, fes, "z", "z", mesh=mesh, tables=tables, mode=mode
+    ).tocsc()
 
     # Coordinates, rigid null space, single KKT factorisation reused below.
     _sfes, xs, ys = _scalar_dof_coords(mesh, inp.degree)
@@ -582,13 +598,7 @@ def assemble_stiffness_matrix(
     # _voigt_strain_from_dshape). Default ordering is fine here.
     fes = mfem.FiniteElementSpace(mesh, fec, 3)
 
-    a = mfem.BilinearForm(fes)
-    a.AddDomainIntegrator(StiffnessIntegrator(C_per_cell))
-    a.Assemble()
-    a.Finalize()
-
-    Asp = _mfem_spmat_to_scipy(a.SpMat())
-    return Asp
+    return _assemble_voigt_form(C_per_cell, fes, "xy", "xy", mesh=mesh)
 
 
 # =============================================================================
@@ -702,13 +712,46 @@ def _orthonormal_rigid(fes, xs, ys) -> list:
     return [Q[:, k].copy() for k in range(Q.shape[1])]
 
 
-def _assemble_voigt_form(C_per_cell, fes, test_kind: str, trial_kind: str):
-    """Assemble ∫ B_test^T C B_trial dA as a scipy CSR via _VoigtFormIntegrator."""
-    a = mfem.BilinearForm(fes)
-    a.AddDomainIntegrator(_VoigtFormIntegrator(C_per_cell, test_kind, trial_kind))
-    a.Assemble()
-    a.Finalize()
-    return _mfem_spmat_to_scipy(a.SpMat())
+def _assemble_voigt_form(
+    C_per_cell,
+    fes,
+    test_kind: str,
+    trial_kind: str,
+    *,
+    mesh=None,
+    tables=None,
+    mode: str | None = None,
+):
+    """Assemble ∫ B_test^T C B_trial dA as a scipy CSR.
+
+    Default path is bulk numba/numpy (``B3_SECFEM_MFEM_ASSEMBLE``); set
+    ``mode="python"`` for the original ``PyBilinearFormIntegrator`` callback.
+    """
+    from .bulk_assemble import assemble_voigt_bulk, resolve_assemble_mode
+
+    m = mode if mode is not None else resolve_assemble_mode()
+    if m == "python":
+        a = mfem.BilinearForm(fes)
+        a.AddDomainIntegrator(_VoigtFormIntegrator(C_per_cell, test_kind, trial_kind))
+        a.Assemble()
+        a.Finalize()
+        return _mfem_spmat_to_scipy(a.SpMat())
+
+    if mesh is None:
+        # FiniteElementSpace keeps a Mesh pointer; PyMFEM exposes GetMesh().
+        mesh = fes.GetMesh() if hasattr(fes, "GetMesh") else None
+        if mesh is None:
+            raise RuntimeError("bulk assemble needs mesh= or fes.GetMesh()")
+    eng = "numba" if m == "numba" else "numpy"
+    return assemble_voigt_bulk(
+        C_per_cell,
+        mesh,
+        fes,
+        test_kind,  # type: ignore[arg-type]
+        trial_kind,  # type: ignore[arg-type]
+        engine=eng,  # type: ignore[arg-type]
+        tables=tables,
+    )
 
 
 def _make_kkt_solver(E, nullvecs):
