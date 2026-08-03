@@ -19,6 +19,22 @@ def test_region_materials_path():
         region_materials={1: RegionMat(material=_iso(), beta_deg=15.0)},
     )
     assert inp.region_materials[1].beta_deg == 15.0
+    assert inp.linear_solver == "gamg"
+
+
+def test_linear_solver_option():
+    inp = SectionInput(
+        mesh_path="x.xdmf",
+        region_materials={1: RegionMat(material=_iso())},
+        linear_solver="lu",
+    )
+    assert inp.linear_solver == "lu"
+    with pytest.raises(Exception):
+        SectionInput(
+            mesh_path="x.xdmf",
+            region_materials={1: RegionMat(material=_iso())},
+            linear_solver="not-a-solver",
+        )
 
 
 def test_per_cell_path():

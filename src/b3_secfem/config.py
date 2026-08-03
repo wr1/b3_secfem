@@ -51,6 +51,18 @@ class SectionInput(BaseModel):
         "fenicsx",
         description="FEM backend: 'fenicsx' (default, requires dolfinx) or 'mfem' (PyMFEM)",
     )
+    # fenicsx-only: how to invert the singular in-plane operator E.
+    # Medium/small invsec sections often pay more for GAMG *setup* than for the
+    # few CG iterations; "lu" (direct, with a tiny shift for the 4-D kernel) and
+    # "ilu" (cheap preconditioner) are better throughput defaults for that size.
+    # mfem always uses a bordered KKT factorisation and ignores this field.
+    linear_solver: Literal["gamg", "lu", "ilu"] = Field(
+        "gamg",
+        description=(
+            "fenicsx linear solver for E: 'gamg' (default CG+GAMG), "
+            "'lu' (direct, shifted), or 'ilu' (CG+ILU). Ignored by mfem."
+        ),
+    )
 
     region_materials: dict[int, RegionMat] | None = None
 

@@ -30,7 +30,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit"]
+dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit", "numba>=0.59"]
+# Optional fast path for mfem bulk assembly (falls back to numpy bulk / python integrator).
+numba = ["numba>=0.59"]
 # airfoilmesh is the sibling ``b3_af`` package (not published to PyPI). The
 # airfoil-section tests skip when it is absent, so it stays OUT of the extras:
 # a hard ``b3_af`` requirement is unsatisfiable in any workspace that does not

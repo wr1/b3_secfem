@@ -88,6 +88,20 @@ def plot_warping(res, mode, out_path, **kwargs):
     return _pw(res, mode, out_path, **kwargs)
 
 
+def prepare_env(*, threads: int = 1, cache_home=None):
+    """Pin BLAS/OpenMP and share FFCx cache; see :mod:`b3_secfem.warm`."""
+    from .warm import prepare_env as _pe
+
+    return _pe(threads=threads, cache_home=cache_home)
+
+
+def warm_up(**kwargs):
+    """Dummy fenicsx solve to pay FFCx JIT once per process; see :mod:`b3_secfem.warm`."""
+    from .warm import warm_up as _wu
+
+    return _wu(**kwargs)
+
+
 __all__ = [
     "IsotropicMaterial",
     "Material",
@@ -98,6 +112,7 @@ __all__ = [
     "materials_from_b3_mat",
     "plot_section",
     "plot_warping",
+    "prepare_env",
     "read_xdmf",
     "recover_strains",
     "recover_unit_load_strains",
@@ -107,5 +122,6 @@ __all__ = [
     "UnitLoadStrainField",
     "to_anba_order",
     "to_gxbeam_order",
+    "warm_up",
     "write_xdmf",
 ]

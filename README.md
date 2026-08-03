@@ -68,7 +68,11 @@ res = solve(inp, backend="mfem")   # default is "fenicsx"
 - **`"fenicsx"`** (default) — full dolfinx / UFL / PETSc path. Produces the
   complete `SectionResult` (K, M, centres, and strain/stress recovery). The
   4-D rigid-body null space of the in-plane operator is projected out with a
-  PETSc `MatNullSpace`.
+  PETSc `MatNullSpace`. For **many medium/small jobs** (e.g. surrogate dataset
+  sweeps), set `linear_solver="lu"` on `SectionInput` — direct factorisation
+  usually beats the default CG+GAMG setup cost on that size class. Agent and
+  runner checklist: **[SKILL.md](SKILL.md)**; numbers in
+  `examples/profile_speed.py` and `notes/mind/speed.md`.
 
 - **`"mfem"`** — PyMFEM serial path (`mfem.ser`), an independent assembly and
   FE engine for cross-validation. A single custom `_VoigtFormIntegrator`
@@ -102,6 +106,9 @@ has fewer binary-compatibility issues than dolfinx on some platforms.
 - `time_backends` gives an assembly-timing table. The MFEM custom integrator
   is a pure-Python per-element loop: faster than fenicsx on tiny meshes (no
   form compilation) but several× slower on large ones.
+- `profile_solve` / `profile_matrix` (and `examples/profile_speed.py`) time
+  **import + cold/warm full solve + recovery** in fresh subprocesses — the
+  metric that matters for spawn-pool surrogate jobs.
 
 Each backend runs in its own subprocess — importing both dolfinx (PETSc/MPI)
 and mfem into one interpreter assembles fine but segfaults at teardown. See
