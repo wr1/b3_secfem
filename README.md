@@ -28,7 +28,8 @@ cross-validation of the formulation. See [Backends](#backends) below.
 
 ```python
 from b3_secfem import (
-    OrthotropicMaterial, RegionMat, SectionInput, solve,
+    OrthotropicMaterial, RegionMat, SectionInput, SectionResult, solve,
+    write_quad_xdmf,
 )
 
 mat = OrthotropicMaterial(
@@ -37,14 +38,20 @@ mat = OrthotropicMaterial(
     nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
 )
 
+# Optional: build an input XDMF from arrays without dolfinx installed
+# write_quad_xdmf("section.xdmf", coords, quads, cell_tags=tags)
+
 inp = SectionInput(
     mesh_path="section.xdmf",
     region_materials={1: RegionMat(material=mat, beta_deg=45.0)},
 )
-res = solve(inp)
+res: SectionResult = solve(inp)
 print(res.K)             # 6x6 stiffness, [Fx,Fy,Fz,Mx,My,Mz]
 print(res.shear_center)
 ```
+
+CLI: `b3_secfem spec.json` or `b3_secfem spec.json --backend mfem`
+(JSON may also set `"backend"`; the CLI flag overrides).
 
 ## Conventions
 

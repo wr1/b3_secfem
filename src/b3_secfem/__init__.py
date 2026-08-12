@@ -6,13 +6,17 @@ Supports two backends (selected via SectionInput.backend or solve(..., backend=.
 
 Pure-numpy surface (no FEM import required):
     IsotropicMaterial, OrthotropicMaterial, Material
-    RegionMat, SectionInput
+    RegionMat, SectionInput, SectionResult
     rotate_stiffness_6x6
     materials_from_b3_mat
+    write_quad_xdmf
+
+Backend-aware helpers (import on use; no extra FEM install if payload already present):
+    cell_centroids, solver_cell_tags
 
 Backend-dependent surface (import on use; only the chosen backend's deps are required at runtime):
     solve, recover_strains, recover_unit_load_strains,
-    SectionResult, StrainField, UnitLoadStrainField
+    StrainField, UnitLoadStrainField
     read_xdmf, write_xdmf, from_gxbeam_vtu
     to_gxbeam_order, to_anba_order
 """
@@ -21,6 +25,7 @@ from .config import RegionMat, SectionInput, materials_from_b3_mat
 from .materials import IsotropicMaterial, Material, OrthotropicMaterial
 from .post import to_anba_order, to_gxbeam_order
 from .recovery import StrainField, UnitLoadStrainField
+from .result import SectionResult
 from .rotation3d import rotate_stiffness_6x6
 
 
@@ -68,6 +73,27 @@ def write_xdmf(path, mesh, cell_tags=None):
     return _w(path, mesh, cell_tags)
 
 
+def write_quad_xdmf(path, coords, quads, cell_tags=None):
+    """Write a quad mesh from arrays (meshio; no FEM backend required)."""
+    from .mesh import write_quad_xdmf as _w
+
+    return _w(path, coords, quads, cell_tags=cell_tags)
+
+
+def cell_centroids(mesh):
+    """Per-cell centroids in the mesh's own cell order (backend-aware)."""
+    from .mesh import cell_centroids as _c
+
+    return _c(mesh)
+
+
+def solver_cell_tags(result, mesh_path):
+    """Per-cell tags in the solver's cell order (backend-aware)."""
+    from .mesh import solver_cell_tags as _s
+
+    return _s(result, mesh_path)
+
+
 def from_gxbeam_vtu(path):
     from .mesh import from_gxbeam_vtu as _f
 
@@ -108,6 +134,8 @@ __all__ = [
     "OrthotropicMaterial",
     "RegionMat",
     "SectionInput",
+    "SectionResult",
+    "cell_centroids",
     "from_gxbeam_vtu",
     "materials_from_b3_mat",
     "plot_section",
@@ -118,10 +146,12 @@ __all__ = [
     "recover_unit_load_strains",
     "rotate_stiffness_6x6",
     "solve",
+    "solver_cell_tags",
     "StrainField",
     "UnitLoadStrainField",
     "to_anba_order",
     "to_gxbeam_order",
     "warm_up",
+    "write_quad_xdmf",
     "write_xdmf",
 ]

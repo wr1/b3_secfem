@@ -2,6 +2,7 @@
 
 Usage:
     b3_secfem path/to/spec.json
+    b3_secfem path/to/spec.json --backend mfem
 """
 
 from __future__ import annotations
@@ -71,17 +72,29 @@ def _print_K(K: np.ndarray, console: Console) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-    parser = argparse.ArgumentParser(description="b3_secfem cross-section solver")
+    parser = argparse.ArgumentParser(
+        description="b3_secfem cross-section solver",
+        epilog=(
+            "JSON may set \"backend\" (fenicsx|mfem). "
+            "CLI --backend overrides the JSON value."
+        ),
+    )
     parser.add_argument("spec", type=Path, help="JSON input spec")
+    parser.add_argument(
+        "--backend",
+        choices=("fenicsx", "mfem"),
+        default=None,
+        help="FEM backend (overrides JSON \"backend\" if set)",
+    )
     args = parser.parse_args(argv)
 
     with args.spec.open() as f:
         spec = json.load(f)
     inp = _build_input(spec)
 
-    from .solver import solve
+    from . import solve
 
-    res = solve(inp)
+    res = solve(inp, backend=args.backend)
 
     console = Console()
     _print_K(res.K, console)

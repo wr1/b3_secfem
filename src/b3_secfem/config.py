@@ -93,7 +93,23 @@ class SectionInput(BaseModel):
 
 
 def materials_from_b3_mat(mat: Any) -> Material:
-    """Convert a b3_mat material to its b3_secfem twin."""
+    """Convert a b3_mat material to its b3_secfem twin.
+
+    Prefer ``isinstance`` against real ``b3_mat`` classes when the package is
+    importable; fall back to class-name matching so ``b3_mat`` stays optional.
+    """
+    try:
+        from b3_mat import IsotropicMaterial as B3Iso
+        from b3_mat import OrthotropicMaterial as B3Ortho
+    except ImportError:
+        B3Iso = B3Ortho = ()  # type: ignore[misc, assignment]
+
+    if B3Iso and isinstance(mat, B3Iso):
+        return IsotropicMaterial(E=mat.E, nu=mat.nu, rho=mat.rho, name=mat.name)
+    if B3Ortho and isinstance(mat, B3Ortho):
+        return OrthotropicMaterial.from_b3_mat(mat)
+
+    # Name fallback for stubs / when b3_mat is not installed
     cls_name = type(mat).__name__
     if cls_name == "IsotropicMaterial":
         return IsotropicMaterial(E=mat.E, nu=mat.nu, rho=mat.rho, name=mat.name)
