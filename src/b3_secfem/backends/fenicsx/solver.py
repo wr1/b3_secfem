@@ -281,37 +281,64 @@ def _assemble_resultants(
         Mx = int  y * sigma_zz dA
         My = int -x * sigma_zz dA           (right-hand rule about y)
         Mz = int (x * sigma_yz - y * sigma_xz) dA
+
+    Batched: one DG0-vector form per mode (6 assemblies) instead of 36
+    scalar ``assemble_scalar`` calls.
     """
     import ufl
     from dolfinx import fem
+    from dolfinx.fem.petsc import assemble_vector
 
     x = ufl.SpatialCoordinate(mesh)
+    n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+    W = fem.functionspace(mesh, ("DG", 0, (6,)))
+    v = ufl.TestFunction(W)
     R = np.zeros((6, 6))
     for i in range(6):
         sigma = ufl.dot(C_func, eps_totals[i])
-        forms = [
-            sigma[4],  # Vx
-            sigma[3],  # Vy
-            sigma[2],  # Fz
-            x[1] * sigma[2],  # Mx
-            -x[0] * sigma[2],  # My
-            x[0] * sigma[3] - x[1] * sigma[4],  # Mz
-        ]
-        for a, integrand in enumerate(forms):
-            R[a, i] = float(fem.assemble_scalar(fem.form(integrand * ufl.dx)))
+        integrands = ufl.as_vector(
+            [
+                sigma[4],  # Vx
+                sigma[3],  # Vy
+                sigma[2],  # Fz
+                x[1] * sigma[2],  # Mx
+                -x[0] * sigma[2],  # My
+                x[0] * sigma[3] - x[1] * sigma[4],  # Mz
+            ]
+        )
+        form = fem.form(ufl.inner(v, integrands) * ufl.dx)
+        b = assemble_vector(form)
+        b.assemble()
+        R[:, i] = b.array.reshape(n_cells, 6).sum(axis=0)
     return R
 
 
 def _assemble_energy_matrix(C_func: Any, eps_totals: dict[int, Any]) -> np.ndarray:
-    """S[i, j] = int_Omega eps_total^(i)^T C eps_total^(j) dA."""
+    """S[i, j] = int_Omega eps_total^(i)^T C eps_total^(j) dA.
+
+    Batched: one DG0-vector form per row i (6 assemblies) instead of 36
+    scalar assemblies.
+    """
     import ufl
     from dolfinx import fem
+    from dolfinx.fem.petsc import assemble_vector
 
+    mesh = C_func.function_space.mesh
+    n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+    W = fem.functionspace(mesh, ("DG", 0, (6,)))
+    v = ufl.TestFunction(W)
     S = np.zeros((6, 6))
     for i in range(6):
-        for j in range(6):
-            integrand = ufl.dot(eps_totals[i], ufl.dot(C_func, eps_totals[j])) * ufl.dx
-            S[i, j] = float(fem.assemble_scalar(fem.form(integrand)))
+        integrands = ufl.as_vector(
+            [
+                ufl.dot(eps_totals[i], ufl.dot(C_func, eps_totals[j]))
+                for j in range(6)
+            ]
+        )
+        form = fem.form(ufl.inner(v, integrands) * ufl.dx)
+        b = assemble_vector(form)
+        b.assemble()
+        S[i, :] = b.array.reshape(n_cells, 6).sum(axis=0)
     return 0.5 * (S + S.T)
 
 

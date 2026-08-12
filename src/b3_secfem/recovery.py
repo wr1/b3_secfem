@@ -128,9 +128,11 @@ def recover_strains(result: SectionResult) -> StrainField:
     sig = np.zeros((6, n_cells, 6))
 
     x = ufl.SpatialCoordinate(mesh)
-    DG0 = fem.functionspace(mesh, ("DG", 0))
-    v = ufl.TestFunction(DG0)
     C_arr = Q_func.x.array.reshape(n_cells, 6, 6)
+
+    # Vector DG0: one form per mode (6 Voigt components) instead of 36 scalars.
+    W = fem.functionspace(mesh, ("DG", 0, (6,)))
+    v6 = ufl.TestFunction(W)
 
     primary = result.u_solutions
     for i in ALL_MODES:
@@ -147,14 +149,12 @@ def recover_strains(result: SectionResult) -> StrainField:
             d2 = None
         eps_total = total_strain_voigt(i, d0, d1, d2)
 
-        for k_voigt in range(6):
-            f = fem.form(v * eps_total[k_voigt] * ufl.dx)
-            b = assemble_vector(f)
-            b.assemble()
-            eps[i, :, k_voigt] = b.array.copy() / cell_areas
-
-        for k in range(n_cells):
-            sig[i, k, :] = C_arr[k] @ eps[i, k, :]
+        form = fem.form(ufl.inner(v6, eps_total) * ufl.dx)
+        b = assemble_vector(form)
+        b.assemble()
+        cell_eps = b.array.reshape(n_cells, 6) / cell_areas[:, None]
+        eps[i, :, :] = cell_eps
+        sig[i, :, :] = np.einsum("cij,cj->ci", C_arr, cell_eps)
 
     return StrainField(epsilon=eps, sigma=sig, cell_areas=cell_areas)
 
