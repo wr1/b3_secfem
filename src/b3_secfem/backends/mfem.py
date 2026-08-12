@@ -335,7 +335,7 @@ else:
 def solve(inp: SectionInput) -> SectionResult:
     """MFEM backend: full Morandini two-stage chain solve (K, M, centres).
 
-    Mirrors the fenicsx reference (``solver._fenicsx_solve``) on the mfem engine.
+    Mirrors the fenicsx reference (``backends.fenicsx.solver``) on the mfem engine.
     A single custom integrator assembles the three section operators
 
         E    = ∫ eps_xy(v)^T C eps_xy(u) dA   (in-plane stiffness)
@@ -355,7 +355,7 @@ def solve(inp: SectionInput) -> SectionResult:
     _require_mfem()
     from types import SimpleNamespace
 
-    from ..solver import _per_cell_arrays
+    from .common import per_cell_arrays
 
     mesh, tags, n_cells = _load_mfem_mesh(inp)
     for e in range(n_cells):
@@ -369,7 +369,7 @@ def solve(inp: SectionInput) -> SectionResult:
         if tags is not None
         else None
     )
-    C_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, ct)
+    C_per_cell, rho_per_cell = per_cell_arrays(inp, n_cells, ct)
 
     fec = mfem.H1_FECollection(inp.degree, mesh.Dimension())
     fes = mfem.FiniteElementSpace(mesh, fec, 3)
@@ -910,7 +910,7 @@ def _compute_centres_mfem(mom: dict, K: np.ndarray) -> dict:
 def _inplane_shear(mesh, fes, C_per_cell, ksolve, xs, ys, area: float):
     """7th cell problem: section-averaged in-plane shear stiffness K_xy.
 
-    Mirrors solver._fenicsx_solve: solve E w = -∫ eps_xy(v)^T C eps_a, subtract the
+    Mirrors backends.fenicsx.solver: solve E w = -∫ eps_xy(v)^T C eps_a, subtract the
     (y, x, 0) component so mean(gamma_xy) = 0, then
     K_xy = ∫ (eps_a + eps_xy(w))^T C (eps_a + eps_xy(w)). eps_a = (0,0,0,0,0,1).
     """

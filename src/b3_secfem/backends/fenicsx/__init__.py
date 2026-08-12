@@ -1,10 +1,7 @@
 """Fenicsx (dolfinx) backend for b3_secfem.
 
-During the initial backend introduction this is a thin adapter around the
-reference implementation that still lives in solver._fenicsx_solve.
-Later the full UFL/PETSc forms, spaces, recovery, etc. will live under
-this module (or a fenicsx/ subpackage) so that importing b3_secfem
-with only the mfem backend installed does not pull in dolfinx symbols.
+UFL forms, function spaces, and the chain solve live here so an mfem-only
+install does not need dolfinx until this backend is selected.
 """
 
 from __future__ import annotations
@@ -15,17 +12,15 @@ import numpy as np
 import scipy.sparse as sp
 
 if TYPE_CHECKING:
-    from ..config import SectionInput
-    from ..result import SectionResult
+    from ...config import SectionInput
+    from ...result import SectionResult
 
 
 def solve(inp: "SectionInput") -> "SectionResult":
     """Run the solve using the fenicsx (dolfinx) engine."""
-    # Delegate to the reference implementation (transition phase).
-    # After the full move this will contain (or import from .fenicsx_impl) the logic.
-    from ..solver import _fenicsx_solve
+    from .solver import solve as _solve
 
-    return _fenicsx_solve(inp)
+    return _solve(inp)
 
 
 def assemble_stiffness_matrix(
@@ -58,14 +53,9 @@ def assemble_stiffness_matrix(
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_matrix
 
-    from ..forms import stiffness_bilinear
-    from ..spaces import (
-        fill_per_cell_stiffness,
-        make_displacement_space,
-        make_stiffness_space,
-    )
+    from .forms import stiffness_bilinear
+    from .spaces import fill_per_cell_stiffness, make_displacement_space, make_stiffness_space
 
-    # Ensure connectivity (sometimes needed when calling helpers directly)
     mesh.topology.create_connectivity(mesh.topology.dim, mesh.topology.dim)
 
     Q = make_stiffness_space(mesh)
@@ -81,9 +71,11 @@ def assemble_stiffness_matrix(
     A_petsc = assemble_matrix(a_form)
     A_petsc.assemble()
 
-    # Convert PETSc Mat to scipy CSR
     ai, aj, av = A_petsc.getValuesCSR()
     A = sp.csr_matrix((av, aj, ai), shape=A_petsc.getSize())
 
     A_petsc.destroy()
     return A
+
+
+__all__ = ["assemble_stiffness_matrix", "solve"]

@@ -52,6 +52,8 @@ print(res.shear_center)
 
 CLI: `b3_secfem spec.json` or `b3_secfem spec.json --backend mfem`
 (JSON may also set `"backend"`; the CLI flag overrides).
+Machine-readable numeric output: `b3_secfem spec.json --json` (or `-j`) —
+K, M, centres, backend on stdout; default remains the Rich human table.
 
 ## Conventions
 
