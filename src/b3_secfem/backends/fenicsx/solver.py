@@ -87,7 +87,23 @@ def solve(inp: SectionInput) -> SectionResult:
     A.setNullSpace(nullspace)
     A.setNearNullSpace(nullspace)
 
-    ksp = _make_ksp(A, mesh.comm, inp.linear_solver)
+    linear_solver = inp.linear_solver
+    # Medium sections: GAMG setup dominates; auto-prefer LU under the default.
+    # Explicit linear_solver="gamg" still gets this path for ndof < 20k — set
+    # B3_SECFEM_FORCE_GAMG=1 to keep iterative GAMG on small systems.
+    if linear_solver == "gamg":
+        import os
+
+        if os.environ.get("B3_SECFEM_FORCE_GAMG", "").strip() not in ("1", "true", "yes"):
+            ndof = int(V.dofmap.index_map.size_local) * int(V.dofmap.index_map_bs)
+            if ndof < 20_000:
+                log.info(
+                    "ndof=%s < 20000: using linear_solver=lu (set B3_SECFEM_FORCE_GAMG=1 to keep gamg)",
+                    ndof,
+                )
+                linear_solver = "lu"
+
+    ksp = _make_ksp(A, mesh.comm, linear_solver)
 
     x = ufl.SpatialCoordinate(mesh)
 

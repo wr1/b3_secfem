@@ -19,7 +19,10 @@
 MAMBA_ENV ?= b3secfem
 MAMBA_RUN ?= micromamba run -n $(MAMBA_ENV)
 
-.PHONY: help install test test-pure lint format check clean install-venv
+.PHONY: help install test test-pure smoke lint format check clean install-venv
+
+PURE_TESTS := tests/test_materials.py tests/test_rotation3d.py tests/test_config.py \
+	tests/test_public_api.py tests/test_cli.py tests/test_common.py
 
 help:
 	@echo "b3_secfem developer targets:"
@@ -27,6 +30,7 @@ help:
 	@echo "  make install      - editable-install b3_mat, airfoilmesh, b3_secfem[dev] into the '$(MAMBA_ENV)' env (run once)"
 	@echo "  make test         - run the full test suite (requires prior 'make install')"
 	@echo "  make test-pure    - run only the pure-Python tests (no dolfinx needed)"
+	@echo "  make smoke        - alias of test-pure (CI / pre-commit gate without fenicsx)"
 	@echo "  make lint         - run ruff linter"
 	@echo "  make format       - run ruff formatter"
 	@echo "  make check        - lint + full test suite + unit-load recovery smoke test"
@@ -42,7 +46,9 @@ test:
 
 # Pure-Python tests (no dolfinx required) — runnable in any env with the deps.
 test-pure:
-	$(MAMBA_RUN) python -m pytest -q --tb=short tests/test_materials.py tests/test_rotation3d.py tests/test_config.py
+	$(MAMBA_RUN) python -m pytest -q --tb=short $(PURE_TESTS)
+
+smoke: test-pure
 
 lint:
 	$(MAMBA_RUN) ruff check src tests

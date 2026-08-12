@@ -77,7 +77,7 @@ def test_vs_gxbeam(tmp_path, case):
     assert c["mc"] < c_tol, msg_c
 
 
+@pytest.mark.skip(reason="ANBA4 cross-check fixture not ported (no anba4 package)")
 def test_iso_ring_vs_anba(tmp_path):
-    """Cross-check vs ANBA4 — placeholder; populated once ANBA env is wired."""
-    pytest.importorskip("anba4")
-    pytest.skip("ANBA4 cross-check fixture not yet ported")
+    """Reserved for future ANBA4 ring comparison once a fixture is wired."""
+    _ = tmp_path

@@ -59,7 +59,8 @@ class SectionInput(BaseModel):
     linear_solver: Literal["gamg", "lu", "ilu"] = Field(
         "gamg",
         description=(
-            "fenicsx linear solver for E: 'gamg' (default CG+GAMG), "
+            "fenicsx linear solver for E: 'gamg' (CG+GAMG; auto-switches to "
+            "'lu' when ndof < 20000 unless B3_SECFEM_FORCE_GAMG=1), "
             "'lu' (direct, shifted), or 'ilu' (CG+ILU). Ignored by mfem."
         ),
     )

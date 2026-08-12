@@ -63,11 +63,18 @@ def per_cell_arrays(
         )
         raise ValueError(msg)
 
-    for k in range(n_cells):
-        rm = inp.region_materials.get(int(tags_per_cell[k]))
-        if rm is None:
-            msg = f"cell {k} has tag {tags_per_cell[k]} with no region material"
-            raise KeyError(msg)
-        C[k] = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
-        rho[k] = rm.material.rho
+    # One rotate per unique region tag (not per cell).
+    for tag, rm in inp.region_materials.items():
+        mask = tags_per_cell == int(tag)
+        if not mask.any():
+            continue
+        C_rot = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
+        C[mask] = C_rot
+        rho[mask] = rm.material.rho
+
+    missing = ~np.isin(tags_per_cell, list(inp.region_materials.keys()))
+    if missing.any():
+        bad = int(tags_per_cell[missing][0])
+        msg = f"cell tag {bad} has no region material"
+        raise KeyError(msg)
     return C, rho
