@@ -1,0 +1,19 @@
+---
+title: How we compare
+description: Rules for calling two solver runs the same physical problem.
+---
+
+ANBA, gxbeam, and secfem are three solvers. Compare them only after the [convention maps](/docs/solvers/adapters) have put the same physical problem into each one.
+
+1. Same mesh topology (document the quad→tri split when ANBA needs triangles).
+2. Same card numbers. Do not rewrite E2/E3 by hand. The SONATA drop-in does not swap the card.
+3. Compare K in **secfem order** `[Fx, Fy, Fz, Mx, My, Mz]`.
+4. Colour mismatch by *source*, not by solver name.
+5. Recovered strain/stress is the same rule in **global** Voigt `(11,22,33,23,13,12)`. Gate: `tests/test_recovery_anba.py`. See [Recovery](/docs/recovery/how-it-works).
+6. A case is “same problem” only if it is this row:
+
+| ANBA / SONATA | secfem |
+|---|---|
+| `(card, fiber, plane)` | `anba_to_secfem_input(card, fiber, plane)` → same card, `β = plane`, `α = fiber` |
+
+Gate script: `examples/validation/same_problem.py`. Ladder + airfoil: [Three-way campaign](/docs/validation/three-way).

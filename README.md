@@ -1,5 +1,11 @@
 # b3_secfem
 
+[![CI](https://github.com/wr1/b3_secfem/actions/workflows/ci.yml/badge.svg)](https://github.com/wr1/b3_secfem/actions/workflows/ci.yml)
+[![Release](https://github.com/wr1/b3_secfem/actions/workflows/release.yml/badge.svg)](https://github.com/wr1/b3_secfem/actions/workflows/release.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Lightweight FEniCSx-based 2D cross-section property solver for composite
 wing / wind-turbine-blade sections.
 
@@ -57,71 +63,60 @@ K, M, centres, backend on stdout; default remains the Rich human table.
 
 ## Conventions
 
-- Beam axis = **z** (out of section plane).
-- Section coordinates = **(x, y)**.
-- Generalised force ordering: **`[Fx, Fy, Fz, Mx, My, Mz]`**.
-- Rotation sign: standard right-hand rule.
-- Material rotation angles `(beta_deg, alpha_deg)`:
-  - `(0, 0)` → fibre along beam axis z (axial — typical UD spar plies).
-  - `alpha=90` → fibre fully in-plane at angle `beta` from x.
+Same zero as ANBA. Details: `docs/conventions/` (`dockb` → `/docs`).
+
+- Section: **`sec_1, sec_2, sec_3` ≡ `x, y, z`**. Geometry in `(x, y)`; `z` is the RH normal / beam axis.
+- Material card: **`mat_1` = fibre**, **`mat_2` = in-ply transverse**, **`mat_3` = ply normal**.
+- Placement `(beta_deg, alpha_deg)`, `R = Rz(β) · Ry(α)`:
+  - `(0, 0)` is the identity: `mat_1 → +x`, `mat_2 → +y`, `mat_3 → +z`.
+  - `α = 90` → fibre along `−z` (beam). `α = 0` → fibre in the section plane; `β` is its angle from `+x`.
+- Force order: **`[Fx, Fy, Fz, Mx, My, Mz]`**.
+- SONATA / ANBA drop-in: same card, `anba_to_secfem_input(card, fiber, plane)` (`β = plane`, `α = fiber`). Do not rewrite E2/E3.
 
 ## Backends
 
-The solver is pluggable. Select the engine with `SectionInput.backend` or the
-`backend=` kwarg to `solve()`:
-
 ```python
-res = solve(inp, backend="mfem")   # default is "fenicsx"
+res = solve(inp)                 # fenicsx (default)
+res = solve(inp, backend="mfem") # cross-check engine
 ```
 
-- **`"fenicsx"`** (default) — full dolfinx / UFL / PETSc path. Produces the
-  complete `SectionResult` (K, M, centres, and strain/stress recovery). The
-  4-D rigid-body null space of the in-plane operator is projected out with a
-  PETSc `MatNullSpace`. For **many medium/small jobs** (e.g. surrogate dataset
-  sweeps), set `linear_solver="lu"` on `SectionInput` — direct factorisation
-  usually beats the default CG+GAMG setup cost on that size class. Agent and
-  runner checklist: **[SKILL.md](SKILL.md)**; numbers in
-  `examples/profile_speed.py` and `notes/mind/speed.md`.
+| Backend | Role |
+|---------|------|
+| **`fenicsx`** | Production path: full `SectionResult` (K, M, centres, recovery). PETSc null-space on the in-plane operator. |
+| **`mfem`** | Independent PyMFEM serial engine for validation (~1e-11 on K/M/centres vs fenicsx). Bulk/numba assembly by default when numba is installed. Multi-grid XDMF / some recovery paths still limited — see backend module docstring. |
 
-- **`"mfem"`** — PyMFEM serial path (`mfem.ser`), an independent assembly and
-  FE engine for cross-validation. A single custom `_VoigtFormIntegrator`
-  assembles the three section operators (`E` in-plane stiffness, `Cmat` xy–z
-  coupling, `Mmat` pure-z); the Morandini two-stage chain then reduces to
-  matrix-vector products, the singular systems are solved via a bordered KKT
-  factorisation (analogue of the PETSc null-space projection), and
-  `K = R S⁻¹ Rᵀ`, `M`, centres and `K_xy` follow from a quadrature pass.
-  `solve(backend="mfem")` returns a complete `SectionResult`, validated
-  against fenicsx to ~1e-11 relative on K / M / centres / K_xy for isotropic
-  and orthotropic sections.
+`mfem` is a core dependency (`scipy` for the bordered KKT solve). Prefer fenicsx for real multi-region sections and invsec.
 
-  **Not yet ported:** strain/stress field recovery (`recover_strains`) and the
-  input-cell-order remap that `per_cell_material` needs on dolfinx-renumbered
-  meshes (region-tagged and uniform sections work).
+### Performance
 
-Install the MFEM backend with `pip install mfem` (or conda); it pulls in
-`scipy`, used only for the singular-system linear algebra. The MFEM backend
-has fewer binary-compatibility issues than dolfinx on some platforms.
+Many medium jobs (e.g. surrogate sweeps) care about **warm** wall time and
+**not** paying FFCx JIT per design:
 
-### Cross-backend validation and timing
+- Prefer **`linear_solver="lu"`** on medium meshes (default CG+GAMG is setup-heavy).
+- **One long-lived spawn pool**, `prepare_env` / `warm_up` once per worker, shared
+  `XDG_CACHE_HOME` (see **[SKILL.md](SKILL.md)**).
+- Profile: `examples/profile_speed.py`, `examples/compare_assemble_speed.py`,
+  `notes/mind/speed.md`.
 
-`b3_secfem.bench` compares the two engines:
+### Cross-backend checks
 
-- `run_comparison` assembles `E` with both engines on the same mesh and
-  compares permutation-invariant quantities (the two engines number global
-  DOFs differently, so operators match only up to `P E Pᵀ`): sorted spectrum,
-  trace, and the 4-D rigid-body null space.
-- `run_full_comparison` runs the complete `solve()` per backend and diffs the
-  physical outputs directly (K, M, K_xy, centres — no permutation ambiguity).
-- `time_backends` gives an assembly-timing table. The MFEM custom integrator
-  is a pure-Python per-element loop: faster than fenicsx on tiny meshes (no
-  form compilation) but several× slower on large ones.
-- `profile_solve` / `profile_matrix` (and `examples/profile_speed.py`) time
-  **import + cold/warm full solve + recovery** in fresh subprocesses — the
-  metric that matters for spawn-pool surrogate jobs.
+`b3_secfem.bench` — `run_comparison` (E spectrum/nullspace), `run_full_comparison`
+(K/M/centres), `time_backends` / `profile_*`. Each backend in its own subprocess
+(dolfinx + mfem teardown is unsafe in one process). See
+`tests/test_backend_comparison.py`, `examples/compare_backends.py`.
 
-Each backend runs in its own subprocess — importing both dolfinx (PETSc/MPI)
-and mfem into one interpreter assembles fine but segfaults at teardown. See
-`tests/test_backend_comparison.py` and `examples/compare_backends.py`.
+## Develop / CI
+
+```bash
+pre-commit install          # ruff lint + format on commit
+make lint && make format    # same tools via Makefile
+make test-pure              # no dolfinx (matches CI unit job)
+make test                   # full suite (needs fenicsx env — see Makefile)
+```
+
+Release: tag `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) → GitHub
+Actions builds sdist/wheel and creates a Release. PyPI publish is optional
+(OIDC stub in `.github/workflows/release.yml`).
 
 ## v0.1 limitations
 

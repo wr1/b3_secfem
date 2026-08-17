@@ -395,3 +395,106 @@ def _bbox(nodes: np.ndarray) -> tuple[float, float, float, float]:
         float(nodes[:, 1].min()),
         float(nodes[:, 1].max()),
     )
+
+
+_LOAD_LABELS = ("Fx", "Fy", "Fz", "Mx", "My", "Mz")
+_VOIGT_LABELS = (
+    r"$\sigma_{xx}$",
+    r"$\sigma_{yy}$",
+    r"$\sigma_{zz}$",
+    r"$\sigma_{yz}$",
+    r"$\sigma_{xz}$",
+    r"$\sigma_{xy}$",
+)
+_EPS_LABELS = (
+    r"$\varepsilon_{xx}$",
+    r"$\varepsilon_{yy}$",
+    r"$\varepsilon_{zz}$",
+    r"$\gamma_{yz}$",
+    r"$\gamma_{xz}$",
+    r"$\gamma_{xy}$",
+)
+# Dominant component per unit load [Fx, Fy, Fz, Mx, My, Mz].
+_DEFAULT_COMPONENTS = (4, 3, 2, 2, 2, 4)
+_INK = "#5c6370"
+
+
+def plot_unit_load_fields(
+    res: SectionResult,
+    fields,
+    out_path: str | Path,
+    *,
+    quantity: str = "sigma",
+    components: list[int] | None = None,
+    title: str | None = None,
+    figsize: tuple[float, float] = (10.8, 5.6),
+    dpi: int = 140,
+) -> Path:
+    """2×3 grid of one Voigt component per applied unit load.
+
+    Default component: σ_xz (Fx), σ_yz (Fy), σ_zz (Fz/Mx/My), σ_xz (Mz).
+    ``fields`` is a ``UnitLoadStrainField`` (or anything with ``sigma`` /
+    ``epsilon`` of shape ``(6, n_cells, 6)``).
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+    from matplotlib.colors import Normalize
+
+    if res.mesh is None:
+        msg = "result has no mesh attached; cannot plot fields"
+        raise ValueError(msg)
+    if quantity not in {"sigma", "epsilon"}:
+        msg = f"quantity must be 'sigma' or 'epsilon'; got {quantity!r}"
+        raise ValueError(msg)
+    data = getattr(fields, quantity)
+    if data.shape[0] != 6 or data.shape[2] != 6:
+        msg = f"{quantity} shape {data.shape} is not (6, n_cells, 6)"
+        raise ValueError(msg)
+
+    nodes, quads = _extract_geometry(res.mesh)
+    verts = nodes[quads]
+    comps = list(components) if components is not None else list(_DEFAULT_COMPONENTS)
+    if len(comps) != 6:
+        msg = f"components must have length 6; got {len(comps)}"
+        raise ValueError(msg)
+    labels = _VOIGT_LABELS if quantity == "sigma" else _EPS_LABELS
+
+    fig, axes = plt.subplots(2, 3, figsize=figsize, dpi=dpi)
+    fig.patch.set_facecolor("none")
+    for k, ax in enumerate(axes.ravel()):
+        ax.set_facecolor("none")
+        vals = np.asarray(data[k, :, comps[k]], dtype=float)
+        vmax = float(np.percentile(np.abs(vals), 98)) or 1.0
+        coll = PolyCollection(
+            verts,
+            array=vals,
+            cmap="RdBu_r",
+            norm=Normalize(-vmax, vmax),
+            edgecolors="0.55",
+            linewidths=0.15,
+        )
+        ax.add_collection(coll)
+        ax.set_aspect("equal")
+        ax.autoscale()
+        ax.tick_params(colors=_INK, labelsize=7)
+        for spine in ax.spines.values():
+            spine.set_color(_INK)
+        ax.set_title(f"{_LOAD_LABELS[k]}  {labels[comps[k]]}", fontsize=9, color=_INK)
+        cb = fig.colorbar(coll, ax=ax, fraction=0.046, pad=0.03)
+        cb.ax.tick_params(labelsize=6, colors=_INK)
+        cb.outline.set_edgecolor(_INK)
+        if k // 3 == 1:
+            ax.set_xlabel("x [m]", color=_INK, fontsize=8)
+        if k % 3 == 0:
+            ax.set_ylabel("y [m]", color=_INK, fontsize=8)
+    if title:
+        fig.suptitle(title, fontsize=11, color=_INK)
+    fig.tight_layout()
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, bbox_inches="tight", facecolor="none")
+    plt.close(fig)
+    return out_path

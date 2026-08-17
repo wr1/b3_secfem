@@ -4,8 +4,8 @@ Voigt convention used throughout the package:
     sigma = (s11, s22, s33, s23, s13, s12)
     epsilon = (e11, e22, e33, 2*e23, 2*e13, 2*e12)   (engineering shears)
 
-Material principal frame: axis 1 = fibre direction. With (beta, alpha) = (0, 0),
-axis 1 lines up with the beam axis z.
+Material principal frame: axis 1 = fibre, axis 2 = in-ply transverse,
+axis 3 = ply normal. With (beta, alpha) = (0, 0): 1 → +x, 2 → +y, 3 → +z.
 """
 
 from __future__ import annotations
@@ -37,8 +37,8 @@ class IsotropicMaterial(BaseModel):
 class OrthotropicMaterial(BaseModel):
     """Orthotropic 3D material in (1, 2, 3) principal frame.
 
-    Axis 1 = fibre. With the default (beta, alpha) = (0, 0), axis 1 points
-    along the beam axis z.
+    Axis 1 = fibre, 2 = in-ply, 3 = ply normal. Default (0, 0) maps
+    1 → +x, 2 → +y, 3 → +z.
     """
 
     E1: float = Field(..., gt=0, description="Young's modulus, fibre [Pa]")

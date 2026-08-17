@@ -1,0 +1,35 @@
+---
+title: ANBA
+description: ANBA4 is a solver with its own angle names. secfem uses the same zero; SONATA can forward the same card.
+---
+
+ANBA is a section solver, not a layer on top of secfem. SONATA already talks to it. To run the same section in secfem, keep the card and rename the two angles.
+
+ANBA `(fiber, plane) = (0, 0)` is the identity (`1 = x`, `2 = y`, `3 = z`). Secfem `(β, α) = (0, 0)` is the same placement. Spanwise UD is ANBA `fiber = 90` = secfem `α = 90`.
+
+<img src="/figures/anba_dropin.png" alt="zero angles vs fibre on the beam" />
+
+## SONATA drop-in
+
+```python
+from b3_secfem import anba_to_secfem_input
+
+place = anba_to_secfem_input(mat_anba, fiber, plane)
+# place.material is the same card
+# place.beta_deg = plane
+# place.alpha_deg = fiber
+```
+
+The card is not rewritten. ANBA’s `transformation_matrix(plane, fiber)` (`sn = −sin`) equals secfem’s bond `T` at those angles — pinned in `tests/test_adapters.py`.
+
+<img src="/figures/formulas.png" alt="secfem R and the ANBA drop-in" />
+
+Helpers live in `b3_secfem.adapters`.
+
+## Other ANBA facts
+
+- Triangle-only. Section plane is still `(x, y)`, `z` out.
+- Orthotropic 3×3 layout: `(E1,E2,E3) / (G23,G13,G12) / (ν23,ν13,ν12)` — see `examples/anba_runner.py`.
+- Compare `K` in **secfem order** `[Fx, Fy, Fz, Mx, My, Mz]`. The runner applies the permutation identified on an isotropic `w ≠ h` rectangle.
+- Docker: `anba4:latest`.
+- Open residuals that are **not** a convention bug: Fy on thin sections; mid-tilt. See [Why they still differ](/docs/theory/residuals) and [known residuals](/docs/validation/known-residuals).

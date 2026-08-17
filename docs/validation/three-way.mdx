@@ -1,0 +1,66 @@
+---
+title: Three-way campaign
+description: secfem, ANBA, and gxbeam on the same physical problems — ladder then a NACA 0018 station.
+---
+
+Ran with the [same-problem map](/docs/solvers/adapters): same card; `β = plane`, `α = fiber`; gxbeam `θ = 0` is fibre on the beam (so `θ = 0` ↔ secfem `α = 90`). Quads are forced CCW before ANBA/gxbeam (secfem already flips in `from_gxbeam_vtu`).
+
+```text
+micromamba run -n b3secfem python examples/validation/three_way.py
+micromamba run -n b3secfem python examples/validation/plot_three_way.py
+```
+
+JSON: `examples/validation/out/three_way.json`. Figures below from that run.
+
+## What agrees
+
+Stage 1 (Fz, Mx, My) after the map:
+
+| case | Fz vs ANBA | Fz vs gxbeam | notes |
+|---|---|---|---|
+| iso rectangle | 0.00 % | 0.00 % | Fy 0.4 % vs ANBA, 8 % vs gxbeam |
+| iso ring | 0.00 % | 0.00 % | all six DOF ≤ 0.3 % vs both |
+| ASYM fibre on beam | 0.00 % | 0.00 % | EA = E1 A; Fy 27 % vs ANBA |
+| ASYM fibre along +x | 0.00 % | 0.00 % | gxbeam at `θ = 90` with the 2↔3 bridge |
+| UD ellipse fibre on beam | 0.00 % | 0.00 % | Fy 24 % vs ANBA; gxbeam all ≤ 0.5 % |
+
+<img src="/figures/compare/kdiag_heatmap.png" alt="percent K-diagonal mismatch, cases by DOF, vs ANBA and vs gxbeam" />
+
+<img src="/figures/compare/ea_vs_fy.png" alt="bar chart: EA matches on every ladder case; Fy is the open residual vs ANBA" />
+
+That is the same split as [Why they still differ](/docs/theory/residuals): the transform is closed; Fy and mid-tilt are formulation.
+
+Mid-tilt (`α = 45`) is the orange/red row. ANBA 9–12 % on Fz/Mx/My; gxbeam 28–38 % on those. Do not edit `R`.
+
+gxbeam has no `β`. On a rectangle that only needs `α`, fibre-on-beam UD matches secfem tightly. The 2↔3 bridge is only for gxbeam’s in-plane endpoint (E2 on `z` vs secfem E3 on `z`).
+
+## NACA 0018 station
+
+Hollow 0018, chord 1 m, glass-biax skin, carbon-UD spar caps, one biax web at 35 % chord. 136 quads. Ply 0° = spanwise → secfem `α = 90`, ANBA `fiber = 90`, gxbeam `θ = 0`; `β` = shell tangent (secfem and ANBA only).
+
+<img src="/figures/compare/naca_centers.png" alt="NACA 0018 mesh with shear and mass centres from each solver" />
+
+| | secfem | gxbeam | ANBA |
+|---|---|---|---|
+| Fz | 1.669e9 | 1.669e9 (0.00 %) | **−1.628e9** (sign) |
+| Mx | 8.886e6 | 8.889e6 (0.03 %) | −1.31e6 |
+| Fy | 5.369e6 | 5.322e6 (0.87 %) | 6.04e6 |
+| My | 2.520e8 | 3.69e7 (85 %) | 1.76e8 |
+| shear centre x | 0.299 | 0.298 | 0.328 (from K) |
+| mass centre x | 0.446 | 0.446 | — |
+
+<img src="/figures/compare/naca_diag.png" alt="log bar chart of |Kii| on the NACA section" />
+
+<img src="/figures/compare/naca_K.png" alt="three 6x6 K matrices, signed log scale" />
+
+**gxbeam** after the CCW fix: axial, Mx, Fy, and both centres sit on secfem. My / Fx / Mz do not — gxbeam never sees the skin `β` (tangent roll of the biax). That is a missing input, not a 2/3 rewrite.
+
+**ANBA** on this multi-region foil returned a **negative** `K[Fz,Fz]` even though every split triangle is CCW (272/272). `|EA|` is close (1.63 vs 1.67 e9) but the matrix is not positive definite. Treat that as a failed ANBA run on this mesh, not as a convention residual. The ladder (single-material) ANBA runs are the ones that close Stage 1.
+
+## How to read a new case
+
+1. Map inputs ([adapters](/docs/solvers/adapters)). Same card.
+2. Flip CW quads before ANBA/gxbeam.
+3. Compare `K` in `[Fx, Fy, Fz, Mx, My, Mz]`.
+4. If Fz/Mx/My match and Fy does not, that is [Stage 2](/docs/theory/residuals).
+5. If Fz comes out negative, stop — do not interpret the rest as material-frame error.

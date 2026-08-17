@@ -1,33 +1,43 @@
-"""6x6 stiffness rotation under (beta, alpha) two-angle convention.
+"""6x6 stiffness rotation under (beta, alpha).
 
-Convention (right-hand rule, ``s = +sin``)
------------------------------------------
-The material principal frame has axis 1 along the fibre. By default —
-``(beta_deg, alpha_deg) = (0, 0)`` — axis 1 of the principal frame is
-mapped onto the **global beam axis z**. This matches the gxbeam_section
-convention where ``theta = 0`` gives axially-aligned fibres (the typical
-case for blade unidirectional spar plies).
+Three steps (right-hand rule, ``s = +sin``)
+-------------------------------------------
+1. Section frame: ``sec_1 = x``, ``sec_2 = y``, ``sec_3 = z``
+   (RH, beam axis out of the mesh plane).
+2. Material frame: ``mat_1`` = fibre, ``mat_2`` = in-ply transverse,
+   ``mat_3`` = ply normal. Written on the card before any angle.
+3. Transform: ``R(β, α)`` takes a material vector into the section::
 
-- ``beta_deg``  : rotation about the beam axis z, in degrees. Sets the
-                  in-plane fibre angle once the fibre is in plane
-                  (i.e. once ``alpha != 0``). Has no effect on the
-                  fibre direction when ``alpha = 0`` because axis 1 is
-                  parallel to z.
-- ``alpha_deg`` : tilt of the fibre out of the axial direction toward
-                  the section plane. ``alpha = 0``  -> fibre along z
-                  (axial).  ``alpha = 90`` -> fibre fully in-plane at
-                  angle ``beta`` from the global x axis.
+       v_section = R(β, α) · v_mat
+       R(β, α)   = Rz(β) · Ry(α)
 
-Implementation: ``R(beta, alpha) = R_z(beta) @ R_y(alpha - 90)``,
-applied to a vector v as ``R @ v``.
+``(β, α) = (0, 0)`` is the identity: ply axes sit on the section axes
+(``mat_1 = +x``, ``mat_2 = +y``, ``mat_3 = +z``). That is the same
+zero as ANBA ``(fiber, plane) = (0, 0)``.
 
-Translation to ANBA4 (which uses ``sn = -sin`` in
-``material_py.py:44``): flip the sign of both ``beta`` and ``alpha``.
+- ``alpha_deg`` : rotation about ``+y``. ``α = 0`` leaves the fibre
+  in the section plane; ``α = 90`` puts it along ``−z`` (beam);
+  ``α = −90`` along ``+z``.
+- ``beta_deg``  : right-hand rotation about ``+z``. At ``α = 0`` this
+  is the in-plane fibre angle from ``+x``.
+
+A material vector sees ``α`` about global ``y``, then ``β`` about
+global ``z``. The two angles do **not** commute except when one
+factor is ``I``.
+
+ANBA is another solver. Its ``transformation_matrix(plane, fiber)``
+(``sn = −sin``) equals this module's bond ``T`` at ``β = plane``,
+``α = fiber``. See ``b3_secfem.adapters``.
 """
 
 from __future__ import annotations
 
 import numpy as np
+
+# Section aliases. The solver still names these x, y, z.
+SEC_1 = np.array([1.0, 0.0, 0.0])
+SEC_2 = np.array([0.0, 1.0, 0.0])
+SEC_3 = np.array([0.0, 0.0, 1.0])
 
 
 def _Rz(deg: float) -> np.ndarray:
@@ -41,13 +51,22 @@ def _Ry(deg: float) -> np.ndarray:
 
 
 def _rotation_matrix_3x3(beta_deg: float, alpha_deg: float) -> np.ndarray:
-    """Active rotation R = R_z(beta) @ R_y(alpha - 90), right-hand rule.
+    """Active rotation R = Rz(beta) @ Ry(alpha).
 
     A vector v_local in the principal frame maps to v_global = R @ v_local.
-    By construction, R(0, 0) @ (1, 0, 0) = (0, 0, 1) so the fibre lies
-    along z by default.
+    R(0, 0) is I.
     """
-    return _Rz(beta_deg) @ _Ry(alpha_deg - 90.0)
+    return _Rz(beta_deg) @ _Ry(alpha_deg)
+
+
+def material_axes(beta_deg: float, alpha_deg: float = 0.0) -> dict[str, np.ndarray]:
+    """Unit vectors of mat_1, mat_2, mat_3 in section coordinates (x, y, z)."""
+    R = _rotation_matrix_3x3(beta_deg, alpha_deg)
+    return {
+        "mat_1": R @ np.array([1.0, 0.0, 0.0]),
+        "mat_2": R @ np.array([0.0, 1.0, 0.0]),
+        "mat_3": R @ np.array([0.0, 0.0, 1.0]),
+    }
 
 
 def _bond_T(R: np.ndarray) -> np.ndarray:
@@ -120,8 +139,7 @@ def rotate_stiffness_6x6(
 
     Voigt order (11, 22, 33, 23, 13, 12). Right-hand rule.
 
-    At ``(beta=0, alpha=0)`` axis 1 of the principal frame coincides with
-    the global beam axis z, i.e. fibre is axial.
+    At ``(beta=0, alpha=0)``: fibre along +x, mat_2 along +y, mat_3 along +z.
     """
     R = _rotation_matrix_3x3(beta_deg, alpha_deg)
     T = _bond_T(R)

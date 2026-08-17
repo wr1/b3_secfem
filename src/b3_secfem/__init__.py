@@ -18,15 +18,22 @@ Backend-dependent surface (import on use; only the chosen backend's deps are req
     solve, recover_strains, recover_unit_load_strains,
     StrainField, UnitLoadStrainField
     read_xdmf, write_xdmf, from_gxbeam_vtu
-    to_gxbeam_order, to_anba_order
+    to_gxbeam_order, from_gxbeam_order, to_anba_order
 """
 
+from .adapters import (
+    anba_to_secfem_angles,
+    anba_to_secfem_input,
+    secfem_from_gxbeam_theta,
+    secfem_to_anba_angles,
+    secfem_to_anba_input,
+)
 from .config import RegionMat, SectionInput, materials_from_b3_mat
 from .materials import IsotropicMaterial, Material, OrthotropicMaterial
-from .post import to_anba_order, to_gxbeam_order
-from .recovery import StrainField, UnitLoadStrainField
+from .post import from_gxbeam_order, to_anba_order, to_gxbeam_order
+from .recovery import StrainField, UnitLoadStrainField, assemble_resultants_from_sigma
 from .result import SectionResult
-from .rotation3d import rotate_stiffness_6x6
+from .rotation3d import SEC_1, SEC_2, SEC_3, material_axes, rotate_stiffness_6x6
 
 
 def solve(inp, backend: str | None = None):
@@ -114,6 +121,13 @@ def plot_warping(res, mode, out_path, **kwargs):
     return _pw(res, mode, out_path, **kwargs)
 
 
+def plot_unit_load_fields(res, fields, out_path, **kwargs):
+    """2×3 grid of recovered unit-load stress/strain; see viz.plot_unit_load_fields."""
+    from .viz import plot_unit_load_fields as _pf
+
+    return _pf(res, fields, out_path, **kwargs)
+
+
 def prepare_env(*, threads: int = 1, cache_home=None):
     """Pin BLAS/OpenMP and share FFCx cache; see :mod:`b3_secfem.warm`."""
     from .warm import prepare_env as _pe
@@ -129,6 +143,10 @@ def warm_up(**kwargs):
 
 
 __all__ = [
+    "anba_to_secfem_angles",
+    "anba_to_secfem_input",
+    "assemble_resultants_from_sigma",
+    "from_gxbeam_order",
     "IsotropicMaterial",
     "Material",
     "OrthotropicMaterial",
@@ -139,11 +157,19 @@ __all__ = [
     "from_gxbeam_vtu",
     "materials_from_b3_mat",
     "plot_section",
+    "plot_unit_load_fields",
     "plot_warping",
     "prepare_env",
     "read_xdmf",
     "recover_strains",
     "recover_unit_load_strains",
+    "SEC_1",
+    "SEC_2",
+    "SEC_3",
+    "material_axes",
+    "secfem_from_gxbeam_theta",
+    "secfem_to_anba_angles",
+    "secfem_to_anba_input",
     "rotate_stiffness_6x6",
     "solve",
     "solver_cell_tags",

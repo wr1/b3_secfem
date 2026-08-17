@@ -1,0 +1,24 @@
+---
+title: Stress
+description: Unit-load σ vs ANBA in global Voigt.
+---
+
+Iso rectangle `0.04 × 0.01` m, steel. Each panel is the *dominant* component for that load (`σ_xz` on Fx, `σ_yz` on Fy, `σ_zz` on Fz/Mx/My, `σ_xz` on Mz).
+
+<img src="/figures/recovery/iso_unit_sigma.png" alt="six unit-load stress fields on an isotropic rectangle" />
+
+## Same problem vs ANBA
+
+After the [map](/docs/solvers/adapters): same card, `β = plane`, `α = fiber`, global Voigt. Gate: `tests/test_recovery_anba.py`.
+
+On this rectangle, `σ_zz` under Fz matches to machine precision (mean `1/A` on both). Under Mx the RMS of `σ_zz` differs by **1.1 %**.
+
+<img src="/figures/recovery/iso_mx_szz_compare.png" alt="secfem vs ANBA sigma_zz under unit Mx" />
+
+ASYM fibre-on-beam (`ANBA (fiber, plane) = (90, 0)` → secfem `(β, α) = (0, 90)`). Stage-1 `σ_zz` still pins.
+
+<img src="/figures/recovery/asym_a90_fz_szz.png" alt="ASYM fibre-on-beam unit-load sigma_zz" />
+
+Fy on this thin rectangle remains a [known residual](/docs/validation/known-residuals) on `K`. The recovered fields still integrate to unit Fy on both codes; do not treat a lower ANBA `K[Fy]` as a field-map bug.
+
+Strain of the same loads: [Strain](/docs/recovery/strain). Hollow foil: [NACA 0018](/docs/recovery/naca).

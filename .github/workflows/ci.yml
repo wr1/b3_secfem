@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint (pre-commit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pre-commit/action@v3.0.1
+
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # dolfinx is not available via pip on GHA. Pure unit tests still gate CI.
+      # b3_mat is a path/workspace dep locally — install from public GitHub here.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "b3_mat @ git+https://github.com/wr1/b3_mat.git"
+          python -m pip install meshio numpy "pydantic>=2" rich "scipy>=1.10" pytest
+          python -m pip install -e . --no-deps
+
+      - name: Run pure unit tests
+        run: |
+          python -m pytest -q --tb=short \
+            tests/test_materials.py \
+            tests/test_rotation3d.py \
+            tests/test_config.py
+
+  # Optional: PyMFEM wheel path (no dolfinx). Fails soft if wheels missing.
+  test-mfem:
+    name: test-mfem (optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install with mfem
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "b3_mat @ git+https://github.com/wr1/b3_mat.git"
+          python -m pip install meshio numpy "pydantic>=2" rich "scipy>=1.10" pytest numba
+          python -m pip install "mfem>=4.8"
+          python -m pip install -e . --no-deps
+      - name: Run mfem-gated tests
+        run: |
+          python -m pytest -q --tb=short \
+            tests/test_mfem_backend.py \
+            tests/test_bulk_assemble.py

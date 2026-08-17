@@ -118,7 +118,7 @@ REGION_THETA_DEG = [23.0, -17.0, 35.0, -41.0]
 
 
 def fmt_diag(K: np.ndarray, names: list[str]) -> str:
-    return " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, np.diag(K)))
+    return " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, np.diag(K), strict=True))
 
 
 def main() -> int:
@@ -130,14 +130,14 @@ def main() -> int:
 
     print(f"NACA 0024  chord=1.0  thickness=0.24  eta_clip=0.01  n_cells={n_cells}")
     counts = np.bincount(region, minlength=4)
-    for r, (mat, th, c) in enumerate(zip(REGION_MATERIAL, REGION_THETA_DEG, counts)):
+    for r, (mat, th, c) in enumerate(zip(REGION_MATERIAL, REGION_THETA_DEG, counts, strict=True)):
         print(f"  region {r}: {mat.name:<8}  θ = {th:>+5.1f}°   ({c} cells)")
     print()
 
     # ── per-cell mat_props + theta arrays for gxbeam ─────────────────────────
     mat_props = np.zeros((n_cells, 10))
     theta_rad = np.zeros(n_cells)
-    for r, (mat, th_deg) in enumerate(zip(REGION_MATERIAL, REGION_THETA_DEG)):
+    for r, (mat, th_deg) in enumerate(zip(REGION_MATERIAL, REGION_THETA_DEG, strict=True)):
         mask = region == r
         mat_props[mask] = ortho_row(mat)
         theta_rad[mask] = np.radians(th_deg)
@@ -176,7 +176,7 @@ def main() -> int:
     ec_b3 = np.asarray(res.elastic_center)  # compat alias for mass
 
     # ── ANBA4 ─────────────────────────────────────────────────────────────────
-    fiber_orient = 90.0 - per_cell_alpha       # ANBA convention: fiber=90 → fibre along z
+    fiber_orient = per_cell_alpha              # same zero: fiber = α, plane = β
     plane_orient = np.zeros(n_cells)
     anba = anba_section_from_arrays(
         coords, quads,
@@ -223,9 +223,9 @@ def main() -> int:
 
     print("(3) Compliance-decoupled stiffness  1 / S[i, i]:")
     inv_diag = lambda S: 1.0 / np.diag(S)  # noqa: E731
-    print(f"  gxbeam:    " + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, inv_diag(S_gx))))
-    print(f"  b3_secfem: " + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, inv_diag(S_b3))))
-    print(f"  ANBA:      " + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, inv_diag(S_anba))))
+    print(f"  gxbeam:    " + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, inv_diag(S_gx), strict=True)))
+    print(f"  b3_secfem: " + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, inv_diag(S_b3), strict=True)))
+    print(f"  ANBA:      " + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, inv_diag(S_anba), strict=True)))
     print()
 
     eps = 1e-30

@@ -68,6 +68,9 @@ testpaths = ["tests"]
 line-length = 88
 target-version = "py311"
 
+[tool.ruff.format]
+quote-style = "double"
+
 [tool.ruff.lint.per-file-ignores]
 # Tests gate dolfinx imports behind pytest.importorskip(), so the heavy
 # imports must legitimately come after a module-level statement.

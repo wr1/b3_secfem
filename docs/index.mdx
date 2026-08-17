@@ -1,0 +1,37 @@
+---
+title: Home
+description: 2D composite cross-section solver — K, M, centres, and unit-load recovery.
+---
+
+**b3_secfem** takes a 2-D mesh of a prismatic section and per-element orthotropic placement, and returns the 6×6 stiffness `K` and mass `M`, plus shear / tension / mass centres. Production backend is FEniCSx; MFEM is a cross-check engine.
+
+```python
+from b3_secfem import OrthotropicMaterial, RegionMat, SectionInput, solve
+
+mat = OrthotropicMaterial(
+    E1=140e9, E2=10e9, E3=10e9,
+    G12=5e9, G13=5e9, G23=3.5e9,
+    nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0,
+)
+inp = SectionInput(
+    mesh_path="section.xdmf",
+    region_materials={1: RegionMat(material=mat, beta_deg=0.0, alpha_deg=90.0)},
+)
+res = solve(inp)          # or solve(inp, backend="mfem")
+print(res.K)              # [Fx, Fy, Fz, Mx, My, Mz]
+print(res.shear_center)
+```
+
+`(β, α) = (0, 0)` is the identity (fibre along `+x`). Spanwise UD is `α = 90`. SONATA / ANBA drop-in: same card, `β = plane`, `α = fiber`.
+
+## In this site
+
+| section | what |
+|---------|------|
+| [Conventions](/docs/conventions/walkthrough) | Section frame, ply card, `R(α, β)`, Voigt, winding |
+| [Theory](/docs/theory/cell-problem) | How `K` is built (Stage 1 vs shear); [why solvers still differ](/docs/theory/residuals) |
+| [Other solvers](/docs/solvers/anba) | ANBA and gxbeam maps — not wrappers, separate codes |
+| [Recovery](/docs/recovery/how-it-works) | Unit-load `σ` / `ε`, [stress](/docs/recovery/stress) and [strain](/docs/recovery/strain) vs ANBA, [NACA](/docs/recovery/naca) |
+| [Validation](/docs/validation/how-we-compare) | Same-problem rules, [three-way](/docs/validation/three-way), residuals |
+
+Batch / invsec: warm fenicsx workers, `linear_solver="lu"`. See the repo `SKILL.md`.

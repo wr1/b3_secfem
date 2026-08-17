@@ -79,5 +79,9 @@ def test_vs_gxbeam(tmp_path, case):
 
 @pytest.mark.skip(reason="ANBA4 cross-check fixture not ported (no anba4 package)")
 def test_iso_ring_vs_anba(tmp_path):
-    """Reserved for future ANBA4 ring comparison once a fixture is wired."""
-    _ = tmp_path
+    """K-level ANBA gate lives in examples/validation/same_problem.py.
+
+    Field-level ANBA compare is tests/test_recovery_anba.py.
+    """
+    del tmp_path
+    pytest.skip("see tests/test_recovery_anba.py")
