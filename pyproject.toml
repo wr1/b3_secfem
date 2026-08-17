@@ -21,11 +21,11 @@ dependencies = [
     "pydantic>=2",
     "rich",
     "b3_mat",
-    # The mfem backend is wheel-only and numpy-1/2 agnostic (only the >=4.8
-    # wheels exist for cp312; older versions are sdist-only and need a native
-    # MFEM toolchain). Core deps so every workspace `uv sync` keeps a
+    # PyMFEM 4.8+ ships manylinux wheels only (numpy-1/2 agnostic); the sdist
+    # asserts on Windows. Older versions are sdist-only and need a native MFEM
+    # toolchain. Core on Linux so every workspace `uv sync` keeps a
     # no-system-deps backend installed; fenicsx stays system-provided.
-    "mfem>=4.8",
+    "mfem>=4.8; sys_platform == 'linux'",
     "scipy>=1.10",  # singular nullspace solves in the mfem chain
 ]
 
@@ -39,10 +39,10 @@ numba = ["numba>=0.59"]
 # ship b3_af (e.g. non-se b3 clients), breaking their universal `uv sync`.
 # Install it directly to exercise those tests: ``pip install -e ../b3_af``
 # (see Makefile), or rely on it already being a workspace member upstream.
-# mfem + scipy are now core dependencies (the wheel-only, no-system-deps
-# backend); this extra remains as a no-op alias so ``b3_secfem[mfem]``
-# installs keep working.
-mfem = ["mfem>=4.8", "scipy>=1.10"]
+# mfem is a Linux-only core dep (the wheel-only, no-system-deps backend);
+# this extra remains as a no-op alias so ``b3_secfem[mfem]`` installs keep
+# working. Same platform marker so the extra cannot request a Windows build.
+mfem = ["mfem>=4.8; sys_platform == 'linux'", "scipy>=1.10"]
 
 [project.scripts]
 b3_secfem = "b3_secfem.cli:main"

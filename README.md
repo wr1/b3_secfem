@@ -49,7 +49,7 @@ mat = OrthotropicMaterial(
 
 inp = SectionInput(
     mesh_path="section.xdmf",
-    region_materials={1: RegionMat(material=mat, beta_deg=45.0)},
+    region_materials={1: RegionMat(material=mat, beta_deg=0.0, alpha_deg=90.0)},
 )
 res: SectionResult = solve(inp)
 print(res.K)             # 6x6 stiffness, [Fx,Fy,Fz,Mx,My,Mz]
@@ -85,7 +85,7 @@ res = solve(inp, backend="mfem") # cross-check engine
 | **`fenicsx`** | Production path: full `SectionResult` (K, M, centres, recovery). PETSc null-space on the in-plane operator. |
 | **`mfem`** | Independent PyMFEM serial engine for validation (~1e-11 on K/M/centres vs fenicsx). Bulk/numba assembly by default when numba is installed. Multi-grid XDMF / some recovery paths still limited — see backend module docstring. |
 
-`mfem` is a core dependency (`scipy` for the bordered KKT solve). Prefer fenicsx for real multi-region sections and invsec.
+`mfem` is a core dependency on Linux (`scipy` for the bordered KKT solve) and is omitted on Windows (PyMFEM has no Windows build). Prefer fenicsx for real multi-region sections and invsec.
 
 ### Performance
 

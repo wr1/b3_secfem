@@ -65,7 +65,8 @@ def _require_mfem():
     if not _MFEM_AVAILABLE:
         msg = (
             "mfem backend requested but PyMFEM (and/or scipy) not installed. "
-            "Install with: pip install 'b3_secfem[mfem]' or conda install -c conda-forge mfem scipy"
+            "PyMFEM ships manylinux wheels only (no Windows build). "
+            "On Linux: pip install 'b3_secfem[mfem]' or conda install -c conda-forge mfem scipy"
         )
         raise RuntimeError(msg)
 
