@@ -19,7 +19,7 @@
 MAMBA_ENV ?= b3secfem
 MAMBA_RUN ?= micromamba run -n $(MAMBA_ENV)
 
-.PHONY: help install test test-pure lint format pre-commit check clean install-venv
+.PHONY: help install test test-pure lint format pre-commit check clean install-venv docs-figures docs
 
 help:
 	@echo "b3_secfem developer targets:"
@@ -33,6 +33,15 @@ help:
 	@echo "  make check        - lint + full test suite + unit-load recovery smoke test"
 	@echo "  make clean        - remove caches and the legacy uv venv"
 	@echo "  make install-venv - legacy: build a uv venv with --system-site-packages (fragile, see header)"
+	@echo "  make docs-figures - regenerate public/figures from rotation3d"
+	@echo "  make docs         - serve DocKB (dockb, PORT=3777)"
+
+docs-figures:
+	$(MAMBA_RUN) python docs/scripts/gen_frames.py
+	$(MAMBA_RUN) python docs/scripts/gen_recovery.py
+
+docs:
+	dockb $(or $(PORT),3777)
 
 install:
 	@echo "==> Installing local b3_mat + airfoilmesh (siblings) + b3_secfem[dev] into '$(MAMBA_ENV)'"
@@ -44,7 +53,7 @@ test:
 
 # Pure-Python tests (no dolfinx required) — runnable in any env with the deps.
 test-pure:
-	$(MAMBA_RUN) python -m pytest -q --tb=short tests/test_materials.py tests/test_rotation3d.py tests/test_config.py
+	$(MAMBA_RUN) python -m pytest -q --tb=short tests/test_materials.py tests/test_rotation3d.py tests/test_adapters.py tests/test_config.py
 
 lint:
 	$(MAMBA_RUN) ruff check src tests

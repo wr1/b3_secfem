@@ -21,7 +21,10 @@ Output schema::
     {
       "K": (6, 6),
       "M": (6, 6),
-      "anba_order": ["Fz", "Mz", "Fx", "Fy", "Mx", "My"],
+      "anba_order": ["Fx", "Fy", "Fz", "Mx", "My", "Mz"],
+      # when spec.recover_fields is true:
+      "epsilon" / "sigma": (6, n_tri, 6)  global Voigt (11,22,33,23,13,12)
+      "tri_area", "tri_centroid"
     }
 
 The dockerised ANBA in `anba4:latest` exposes the **old** API:
@@ -33,8 +36,64 @@ matching the public ``examples/anbax_C_section.py``).
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
+
+_LOADS = (
+    ([1.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+    ([0.0, 1.0, 0.0], [0.0, 0.0, 0.0]),
+    ([0.0, 0.0, 1.0], [0.0, 0.0, 0.0]),
+    ([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
+    ([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]),
+    ([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]),
+)
+
+
+def _field_array(returned, anba, attr: str, n_cells: int):
+    import numpy as np
+
+    fun = returned if returned is not None else getattr(anba, attr, None)
+    if fun is None:
+        msg = f"ANBA {attr} field missing after recovery"
+        raise RuntimeError(msg)
+    vec = fun.vector()
+    raw = vec.get_local() if hasattr(vec, "get_local") else np.asarray(vec)
+    arr = np.asarray(raw, dtype=np.float64).reshape(-1, 6)
+    if arr.shape[0] != n_cells:
+        msg = f"{attr} has {arr.shape[0]} cells, mesh has {n_cells}"
+        raise RuntimeError(msg)
+    return arr
+
+
+def _recover_unit_fields(anba, node_xy, tri_conn, n_cells):
+    import numpy as np
+
+    eps = np.zeros((6, n_cells, 6))
+    sig = np.zeros((6, n_cells, 6))
+    for k, (force, moment) in enumerate(_LOADS):
+        ret_s = anba.stress_field(force, moment, "global", "anba")
+        sig[k] = _field_array(ret_s, anba, "STRESS", n_cells)
+        ret_e = anba.strain_field(force, moment, "global", "anba")
+        eps[k] = _field_array(ret_e, anba, "STRAIN", n_cells)
+
+    p = np.asarray(node_xy, dtype=np.float64)
+    t = np.asarray(tri_conn, dtype=np.int64)
+    a = p[t[:, 0]]
+    b = p[t[:, 1]]
+    c = p[t[:, 2]]
+    area = 0.5 * np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1])
+                        - (c[:, 0] - a[:, 0]) * (b[:, 1] - a[:, 1]))
+    cent = (a + b + c) / 3.0
+    return {
+        "load_order": ["Fx", "Fy", "Fz", "Mx", "My", "Mz"],
+        "voigt": ["11", "22", "33", "23", "13", "12"],
+        "reference": "global",
+        "epsilon": eps.tolist(),
+        "sigma": sig.tolist(),
+        "tri_area": area.tolist(),
+        "tri_centroid": cent.tolist(),
+    }
 
 
 def main() -> int:
@@ -42,8 +101,9 @@ def main() -> int:
     import numpy as np
     from anba4 import anbax, material
 
-    spec_path = Path("/workdir/anba_spec.json")
-    out_path = Path("/workdir/anba_out.json")
+    workdir = Path(os.environ.get("ANBA_WORKDIR", "/workdir"))
+    spec_path = workdir / "anba_spec.json"
+    out_path = workdir / "anba_out.json"
 
     spec = json.loads(spec_path.read_text())
 
@@ -126,14 +186,16 @@ def main() -> int:
     K = np.array(stiff.getValues(range(6), range(6)))
     M = np.array(mass.getValues(range(6), range(6)))
 
-    # Empirically (verified on iso unit square): the dockerised ANBA's
-    # K matrix is in [Fx, Fy, Fz, Mx, My, Mz] order — same as b3_secfem.
-    # No permutation needed to compare against b3_secfem.K directly.
+    # docker anbax.compute() returns secfem order. Identified on an
+    # isotropic 0.04×0.01 rectangle: EA, EIxx, EIyy land on indices
+    # 2, 3, 4 (see examples/validation/same_problem.py).
     result = {
         "anba_order": ["Fx", "Fy", "Fz", "Mx", "My", "Mz"],
         "K": K.tolist(),
         "M": M.tolist(),
     }
+    if spec.get("recover_fields"):
+        result.update(_recover_unit_fields(anba, node_xy, tri_conn, n_cells))
     out_path.write_text(json.dumps(result, indent=2))
     print(f"wrote {out_path}")
     return 0

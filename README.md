@@ -54,13 +54,15 @@ print(res.shear_center)
 
 ## Conventions
 
-- Beam axis = **z** (out of section plane).
-- Section coordinates = **(x, y)**.
-- Generalised force ordering: **`[Fx, Fy, Fz, Mx, My, Mz]`**.
-- Rotation sign: standard right-hand rule.
-- Material rotation angles `(beta_deg, alpha_deg)`:
-  - `(0, 0)` → fibre along beam axis z (axial — typical UD spar plies).
-  - `alpha=90` → fibre fully in-plane at angle `beta` from x.
+Same zero as ANBA. Details: `docs/conventions/` (`dockb` → `/docs`).
+
+- Section: **`sec_1, sec_2, sec_3` ≡ `x, y, z`**. Geometry in `(x, y)`; `z` is the RH normal / beam axis.
+- Material card: **`mat_1` = fibre**, **`mat_2` = in-ply transverse**, **`mat_3` = ply normal**.
+- Placement `(beta_deg, alpha_deg)`, `R = Rz(β) · Ry(α)`:
+  - `(0, 0)` is the identity: `mat_1 → +x`, `mat_2 → +y`, `mat_3 → +z`.
+  - `α = 90` → fibre along `−z` (beam). `α = 0` → fibre in the section plane; `β` is its angle from `+x`.
+- Force order: **`[Fx, Fy, Fz, Mx, My, Mz]`**.
+- SONATA / ANBA drop-in: same card, `anba_to_secfem_input(card, fiber, plane)` (`β = plane`, `α = fiber`). Do not rewrite E2/E3.
 
 ## Backends
 

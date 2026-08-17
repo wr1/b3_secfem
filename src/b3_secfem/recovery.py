@@ -159,6 +159,53 @@ def recover_strains(result: SectionResult) -> StrainField:
     return StrainField(epsilon=eps, sigma=sig, cell_areas=cell_areas)
 
 
+def assemble_resultants_from_sigma(
+    sigma: np.ndarray,
+    mesh: Any,
+    cell_areas: np.ndarray | None = None,
+) -> np.ndarray:
+    """Integrate one recovered Voigt stress field to [Fx, Fy, Fz, Mx, My, Mz].
+
+    ``sigma`` is shape ``(n_cells, 6)``. Integrands match
+    ``solver._assemble_resultants``:
+
+        Fx = ∫ σ_xz dA,  Fy = ∫ σ_yz dA,  Fz = ∫ σ_zz dA,
+        Mx = ∫ y σ_zz dA, My = ∫ −x σ_zz dA,
+        Mz = ∫ (x σ_yz − y σ_xz) dA.
+
+    ``cell_areas`` is accepted for API symmetry and unused: the UFL forms
+    integrate against the mesh measure.
+    """
+    del cell_areas
+    import ufl
+    from dolfinx import fem
+
+    n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+    if sigma.shape != (n_cells, 6):
+        msg = f"sigma shape {sigma.shape} != ({n_cells}, 6)"
+        raise ValueError(msg)
+
+    Q = fem.functionspace(mesh, ("DG", 0, (6,)))
+    sig_func = fem.Function(Q, name="sigma_recovered")
+    sig_func.x.array[:] = np.asarray(sigma, dtype=float).ravel()
+    sig_func.x.scatter_forward()
+
+    x = ufl.SpatialCoordinate(mesh)
+    sv = ufl.as_vector([sig_func[i] for i in range(6)])
+    forms = [
+        sv[4],
+        sv[3],
+        sv[2],
+        x[1] * sv[2],
+        -x[0] * sv[2],
+        x[0] * sv[3] - x[1] * sv[4],
+    ]
+    R = np.zeros(6)
+    for a, integrand in enumerate(forms):
+        R[a] = float(fem.assemble_scalar(fem.form(integrand * ufl.dx)))
+    return R
+
+
 def _cell_areas(mesh: Any) -> np.ndarray:
     import ufl
     from dolfinx import fem

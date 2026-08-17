@@ -24,6 +24,28 @@ import numpy as np
 
 _RUNNER = Path(__file__).resolve().parent / "anba_runner.py"
 
+_LOCAL_ANBA_PY = (
+    Path(os.environ.get("ANBA_PYTHON", ""))
+    if os.environ.get("ANBA_PYTHON")
+    else Path.home() / ".local" / "share" / "mamba" / "envs" / "anba4" / "bin" / "python"
+)
+
+
+def _docker_image_ok(image: str) -> bool:
+    if shutil.which("docker") is None:
+        return False
+    proc = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def _local_anba_ok() -> bool:
+    return _LOCAL_ANBA_PY.is_file()
+
 
 def _quads_to_tris(quads: np.ndarray) -> np.ndarray:
     """Split each CCW quad ``[n0, n1, n2, n3]`` into two CCW triangles."""
@@ -44,6 +66,7 @@ def anba_section_from_arrays(
     workdir_root: Path | None = None,
     image: str = "anba4:latest",
     degree: int = 2,
+    recover_fields: bool = False,
 ) -> dict:
     """Run ANBA4 in Docker and return its 6×6 K, M as numpy arrays.
 
@@ -61,6 +84,10 @@ def anba_section_from_arrays(
         quad's value.
     plane_orientation_deg : (n_cells,) float
         Per-quad plane orientation (degrees). Same fan-out.
+    recover_fields : bool
+        If True, also recover the 6 unit-load global Voigt strain/stress
+        fields (shape ``(6, n_tri, 6)``) plus ``tri_area`` / ``tri_centroid``.
+        Child triangles of parent quad ``i`` are ``i`` and ``i + n_quads``.
     workdir_root : Path, optional
         Parent directory for the bind-mounted scratch dir. Must be under
         ``$HOME`` on snap-installed Docker. Defaults to ``$HOME``.
@@ -115,6 +142,7 @@ def anba_section_from_arrays(
             "fiber_orientation_deg": fiber_tri.tolist(),
             "plane_orientation_deg": plane_tri.tolist(),
             "degree": degree,
+            "recover_fields": bool(recover_fields),
         }
         if isinstance(material, (list, tuple)):
             if material_id is None:
@@ -132,20 +160,42 @@ def anba_section_from_arrays(
         (workdir / "anba_spec.json").write_text(json.dumps(spec))
         shutil.copy(_RUNNER, workdir / "anba_runner.py")
 
-        cmd = [
-            "docker", "run", "--rm",
-            "--user", f"{os.getuid()}:{os.getgid()}",
-            "-e", "DIJITSO_CACHE_DIR=/workdir/.dijitso",
-            "-e", "XDG_CACHE_HOME=/workdir/.cache",
-            "-e", "INSTANT_CACHE_DIR=/workdir/.instant",
-            "-e", "DOLFIN_CACHE_DIR=/workdir/.dolfin",
-            "-e", "HOME=/workdir",
-            "-v", f"{workdir}:/workdir",
-            "--entrypoint", "/usr/local/bin/_entrypoint.sh",
-            image,
-            "python", "/workdir/anba_runner.py",
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if _docker_image_ok(image):
+            cmd = [
+                "docker", "run", "--rm",
+                "--user", f"{os.getuid()}:{os.getgid()}",
+                "-e", "DIJITSO_CACHE_DIR=/workdir/.dijitso",
+                "-e", "XDG_CACHE_HOME=/workdir/.cache",
+                "-e", "INSTANT_CACHE_DIR=/workdir/.instant",
+                "-e", "DOLFIN_CACHE_DIR=/workdir/.dolfin",
+                "-e", "HOME=/workdir",
+                "-v", f"{workdir}:/workdir",
+                "--entrypoint", "/usr/local/bin/_entrypoint.sh",
+                image,
+                "python", "/workdir/anba_runner.py",
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        elif _local_anba_ok():
+            env = os.environ.copy()
+            env["ANBA_WORKDIR"] = str(workdir)
+            env["HOME"] = str(workdir)
+            env["DIJITSO_CACHE_DIR"] = str(workdir / ".dijitso")
+            env["XDG_CACHE_HOME"] = str(workdir / ".cache")
+            env["INSTANT_CACHE_DIR"] = str(workdir / ".instant")
+            env["DOLFIN_CACHE_DIR"] = str(workdir / ".dolfin")
+            proc = subprocess.run(
+                [str(_LOCAL_ANBA_PY), str(workdir / "anba_runner.py")],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+                cwd=str(workdir),
+            )
+        else:
+            raise RuntimeError(
+                f"no ANBA: docker image {image!r} missing and "
+                f"local {_LOCAL_ANBA_PY} not found"
+            )
         out_path = workdir / "anba_out.json"
         if not out_path.exists():
             msg = (
@@ -155,11 +205,23 @@ def anba_section_from_arrays(
             raise RuntimeError(msg)
 
         data = json.loads(out_path.read_text())
-        return {
+        out = {
             "K": np.asarray(data["K"]),
             "M": np.asarray(data["M"]),
             "anba_order": data["anba_order"],
         }
+        if recover_fields:
+            if "sigma" not in data:
+                msg = "ANBA runner did not return recovered fields"
+                raise RuntimeError(msg)
+            out["epsilon"] = np.asarray(data["epsilon"], dtype=np.float64)
+            out["sigma"] = np.asarray(data["sigma"], dtype=np.float64)
+            out["tri_area"] = np.asarray(data["tri_area"], dtype=np.float64)
+            out["tri_centroid"] = np.asarray(data["tri_centroid"], dtype=np.float64)
+            out["load_order"] = data.get("load_order", data["anba_order"])
+            out["voigt"] = data.get("voigt")
+            out["reference"] = data.get("reference")
+        return out
     finally:
         # Tear down the scratch dir; dolfin caches inside it can be
         # several MB.

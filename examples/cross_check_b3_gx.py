@@ -316,16 +316,11 @@ def run_case(case: Case, out_dir: Path, with_anba: bool = False) -> dict:
 
     K_anba = None
     if with_anba:
-        # ANBA convention (verified empirically on UD with E1=135, E2=E3=10):
-        #   fiber=90°, plane=0°  → fibre along beam axis z   (≡ b3_secfem α=0)
-        #   fiber=0°,  plane=0°  → fibre in section plane    (≡ b3_secfem α=90)
-        # So the mapping for our cross-check is:
-        #     ANBA.fiber_orientation_deg = 90 − alpha_deg
-        # with plane_orientation_deg = 0.
+        # Same zero as secfem: fiber = α, plane = β (= 0 here).
         alpha_deg = np.degrees(case.theta_rad)
         anba = anba_section_from_arrays(
             coords, quads, case.material,
-            fiber_orientation_deg=np.full(n_cells, 90.0 - alpha_deg),
+            fiber_orientation_deg=np.full(n_cells, alpha_deg),
             plane_orientation_deg=np.full(n_cells, 0.0),
         )
         # ANBA returns K in [Fx, Fy, Fz, Mx, My, Mz] — same as b3_secfem.K.

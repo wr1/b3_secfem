@@ -99,7 +99,7 @@ def run_three_engines(
     # ANBA — fiber=90-alpha, plane=0 (verified mapping)
     anba = anba_section_from_arrays(
         coords, quads, mat,
-        fiber_orientation_deg=np.full(n_cells, 90.0 - alpha_deg),
+        fiber_orientation_deg=np.full(n_cells, alpha_deg),
         plane_orientation_deg=np.full(n_cells, 0.0),
     )
     K_anba = to_gxbeam_order(anba["K"])

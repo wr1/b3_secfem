@@ -15,8 +15,12 @@ class RegionMat(BaseModel):
     """Material + orientation assigned to a tagged region of the mesh."""
 
     material: Material
-    beta_deg: float = Field(0.0, description="Fibre angle about beam axis z [deg]")
-    alpha_deg: float = Field(0.0, description="Ply tilt about new x' axis [deg]")
+    beta_deg: float = Field(
+        0.0, description="Rotation about +z [deg]; at α=0 the in-plane fibre angle"
+    )
+    alpha_deg: float = Field(
+        0.0, description="Rotation about +y [deg]; 0 = fibre in xy, 90 = fibre along −z"
+    )
 
 
 class SectionInput(BaseModel):

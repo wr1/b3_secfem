@@ -84,6 +84,12 @@ def to_gxbeam_order(K: np.ndarray) -> np.ndarray:
     return K[np.ix_(perm, perm)]
 
 
+def from_gxbeam_order(K: np.ndarray) -> np.ndarray:
+    """Permute gxbeam [F1, F2, F3, M1, M2, M3] → [Fx, Fy, Fz, Mx, My, Mz]."""
+    perm = np.array([1, 2, 0, 4, 5, 3])
+    return K[np.ix_(perm, perm)]
+
+
 def to_anba_order(K: np.ndarray) -> np.ndarray:
     """Permute b3_secfem [Fx, Fy, Fz, Mx, My, Mz] -> ANBA chain order.
 

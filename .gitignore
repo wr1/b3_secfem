@@ -1,6 +1,9 @@
 # notes repo — tracked separately
 notes/
 
+# DocKB internal layer (own git repo)
+kb/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -27,6 +30,7 @@ examples/cross_check_out/
 examples/example_out/
 examples/airfoil_stress_out/
 examples/mfem_strain_out/
+examples/validation/out/
 *.npz
 
 # Editor / tool state

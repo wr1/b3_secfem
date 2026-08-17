@@ -1,0 +1,28 @@
+---
+title: Known residuals
+description: Disagreements that remain after the convention map.
+---
+
+From `examples/validation/same_problem.py` on the 0.04×0.01 rectangle, ASYM card E1=160 / E2=80 / E3=20 GPa. Convention map applied (`β = plane`, `α = fiber`, card unchanged). Compare in secfem order.
+
+The leftover gaps are formulation and mesh, not the transform. Plain-language account: [Why they still differ](/docs/theory/residuals).
+
+## Pins (convention closed)
+
+| ANBA `(fiber, plane)` | `EA/A` | Fz / Mx / My | Fx | Mz | Fy |
+|---|---|---|---|---|---|
+| `(0, 0)` | E3 = 20 GPa | 0.00 % | 0.00 % | 0.30 % | **13 %** |
+| `(90, 0)` | E1 = 160 GPa | 0.00 % | 0.00 % | 0.37 % | **27 %** |
+| `(0, 90)` | E3 = 20 GPa | 0.00 % | 0.00 % | 0.39 % | **20 %** |
+
+ANBA raw `K` on an isotropic `w ≠ h` rectangle is already `[Fx, Fy, Fz, Mx, My, Mz]` (EA, EIxx, EIyy land on indices 2, 3, 4).
+
+## Still open (not a 2/3 or zero-angle bug)
+
+| residual | size | nature |
+|---|---|---|
+| Fy on this thin rectangle | 13–27 % vs ANBA | Stage-2 shear; secfem ≈ `5/6 G_{yz} A`; ANBA low. Iso (`G` equal) agrees to 0.4 %. |
+| mid-tilt `(fiber, plane) = (45, 0)` | 9–12 % on Fz/Mx/My; larger on Fx/Mz | same `C̄`; fibre diagonal to the mesh; do not edit `R` |
+| mid-tilt `(30, 45)` | ~8 % on Fz/Mx/My | same family |
+
+Do not "fix" these by changing `R` or swapping E2/E3.

@@ -1,0 +1,20 @@
+---
+title: Material
+description: Step 2 — the ply card in mat_1, mat_2, mat_3, before it is placed on the section.
+---
+
+This is step 2 of [three](/docs/conventions/walkthrough). The card does not know about the section. The map onto the section is step 3.
+
+The orthotropic card is written in `(mat_1, mat_2, mat_3)` *before* any placement.
+
+<img src="/figures/mat_card.png" alt="unplaced ply: fibre along 1, in-ply 2, ply-normal 3 toward viewer" />
+
+| axis | meaning | stiffness |
+|------|---------|-----------|
+| `mat_1` | fibre | `E1`, `G12`, `G13`, `ν12`, `ν13` |
+| `mat_2` | in-ply transverse | `E2`, `G12`, `G23`, `ν12`, `ν23` |
+| `mat_3` | ply normal | `E3`, `G13`, `G23`, `ν13`, `ν23` |
+
+`OrthotropicMaterial.C_local()` is this card, Voigt `(11, 22, 33, 23, 13, 12)` in *material* indices.
+
+At `(β, α) = (0, 0)` the card axes sit on the section axes (`1 = x`, `2 = y`, `3 = z`). That is a [transform](/docs/conventions/placement) fact, not a card fact. ANBA uses the same zero — forward the card unchanged. See [ANBA](/docs/solvers/anba).

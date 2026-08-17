@@ -1,0 +1,58 @@
+---
+title: Transform
+description: Step 3 — R(α, β) rotates the material frame into the section frame.
+---
+
+This is step 3 of [three](/docs/conventions/walkthrough). It is the only map from [material](/docs/conventions/material-card) into [section](/docs/conventions/section-frame).
+
+```
+R(β, α) = Rz(β) · Ry(α)
+```
+
+`v_section = R · v_mat`. A material vector sees **`α` about global `y`, then `β` about global `z`**. `(0, 0)` is the identity — the same zero as ANBA `(fiber, plane) = (0, 0)`.
+
+The two angles **do not commute**. `Rz(β)·Ry(α)` equals `Ry(α)·Rz(β)` only when `β = 0` or `α = 0`.
+
+<img src="/figures/place_angle_order.png" alt="chosen vs swapped β/α product at (45,0) and (45,45)" />
+
+Figures below are generated from `material_axes` (`make docs-figures`).
+
+## Default `(β, α) = (0, 0)`
+
+<img src="/figures/place_a0.png" alt="(0,0): fibre along +x, mat_2 along +y, mat_3 along +z" />
+
+| axis | lands on |
+|------|----------|
+| `mat_1` fibre | `+sec_1` (`+x`) |
+| `mat_2` in-ply | `+sec_2` (`+y`) |
+| `mat_3` ply-normal | `+sec_3` (`+z`) |
+
+## `β` at `α = 0`
+
+`β` is a right-hand rotation about `+sec_3`. The fibre stays in the section plane. `β = 0` is fibre along `+x`; `β = 90` is fibre along `+y`.
+
+<img src="/figures/place_beta_alpha0.png" alt="beta sweep at alpha 0" />
+
+## Other pins
+
+| `(β, α)` | what |
+|----------|------|
+| `(0, 90)` | fibre along `−z` (beam); `mat_2` along `+y`; `mat_3` along `+x`. Same `T` as ANBA `(fiber, plane) = (90, 0)`. |
+| `(90, 0)` | fibre along `+y`; `mat_2` along `−x`; `mat_3` along `+z` |
+
+<img src="/figures/place_a90.png" alt="(0, 90) fibre on the beam" />
+<img src="/figures/place_b90_a0.png" alt="(90, 0) fibre along +y" />
+
+## `β` at `α = 90` and `α = 45`
+
+At `α = 90` the fibre stays on `−z`; `β` rolls 2/3 in the section.
+
+<img src="/figures/place_beta_alpha90.png" alt="beta sweep at alpha 90" />
+
+At `α = 45` a 2-D view collapses `mat_1` and `mat_3`; use the 3-D figure.
+
+<img src="/figures/place_beta_alpha45.png" alt="3-D beta sweep at alpha 45" />
+
+<img src="/figures/formulas.png" alt="secfem R and the ANBA drop-in" />
+
+Do not edit `R` to chase another solver. SONATA forwards the same card; only the angle names change. See [ANBA](/docs/solvers/anba).
