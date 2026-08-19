@@ -1,0 +1,15 @@
+---
+title: Voigt and loads
+description: Voigt (11,22,33,23,13,12) and force order [Fx, Fy, Fz, Mx, My, Mz].
+---
+
+After the [transform](/docs/conventions/placement) (step 3), Voigt indices are *section* indices (`11 = xx`, `33 = zz`). Engineering shears (`γ = 2ε`).
+
+<img src="/figures/voigt_force.png" alt="Voigt index table and force order" />
+
+`C̄ = T C_local Tᵀ` with `T` from `_bond_T(R)`. Generalised forces are `[Fx, Fy, Fz, Mx, My, Mz]` along / about `(sec_1, sec_2, sec_3)`.
+
+Permutations into other solvers live on those pages — do not duplicate them here:
+
+- [ANBA](/docs/solvers/anba) — compare in secfem order; `to_anba_order` is the chain permutation if you need it
+- [gxbeam](/docs/solvers/gxbeam) — `[Fz, Fx, Fy, Mz, Mx, My]` via `to_gxbeam_order`

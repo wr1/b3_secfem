@@ -15,8 +15,12 @@ class RegionMat(BaseModel):
     """Material + orientation assigned to a tagged region of the mesh."""
 
     material: Material
-    beta_deg: float = Field(0.0, description="Fibre angle about beam axis z [deg]")
-    alpha_deg: float = Field(0.0, description="Ply tilt about new x' axis [deg]")
+    beta_deg: float = Field(
+        0.0, description="Rotation about +z [deg]; at α=0 the in-plane fibre angle"
+    )
+    alpha_deg: float = Field(
+        0.0, description="Rotation about +y [deg]; 0 = fibre in xy, 90 = fibre along −z"
+    )
 
 
 class SectionInput(BaseModel):
@@ -50,6 +54,18 @@ class SectionInput(BaseModel):
     backend: Literal["fenicsx", "mfem"] = Field(
         "fenicsx",
         description="FEM backend: 'fenicsx' (default, requires dolfinx) or 'mfem' (PyMFEM)",
+    )
+    # fenicsx-only: how to invert the singular in-plane operator E.
+    # Medium/small invsec sections often pay more for GAMG *setup* than for the
+    # few CG iterations; "lu" (direct, with a tiny shift for the 4-D kernel) and
+    # "ilu" (cheap preconditioner) are better throughput defaults for that size.
+    # mfem always uses a bordered KKT factorisation and ignores this field.
+    linear_solver: Literal["gamg", "lu", "ilu"] = Field(
+        "gamg",
+        description=(
+            "fenicsx linear solver for E: 'gamg' (default CG+GAMG), "
+            "'lu' (direct, shifted), or 'ilu' (CG+ILU). Ignored by mfem."
+        ),
     )
 
     region_materials: dict[int, RegionMat] | None = None

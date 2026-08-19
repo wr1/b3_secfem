@@ -1,0 +1,27 @@
+---
+title: Strain
+description: Unit-load ε vs ANBA, including Poisson ε_xx.
+---
+
+Same iso rectangle and loads as [Stress](/docs/recovery/stress). Dominant component per panel matches that grid (`γ_xz` on Fx, `γ_yz` on Fy, `ε_zz` on Fz/Mx/My, `γ_xz` on Mz).
+
+<img src="/figures/recovery/iso_unit_eps.png" alt="six unit-load strain fields on an isotropic rectangle" />
+
+## Same problem vs ANBA
+
+Stage-1 `ε_zz` (Fz, Mx, My). Top row secfem, bottom row ANBA. Fz mean matches to machine precision; Mx `ε_zz` RMS is the same **1.1 %** as the stress field (homogeneous iso, so `σ = C ε` is a uniform scale).
+
+<img src="/figures/recovery/iso_strain_compare.png" alt="secfem vs ANBA Stage-1 epsilon_zz" />
+
+Poisson check under Fz: a free isotropic section contracts `ε_xx = ε_yy = −ν ε_zz`. Both codes recover that field (`ε_xx / ε_zz = −0.30`).
+
+<img src="/figures/recovery/iso_fz_exx_compare.png" alt="secfem vs ANBA Poisson epsilon_xx under unit Fz" />
+
+| field | rel |
+|---|---|
+| Fz `ε_zz` mean | machine precision |
+| Fz `ε_xx` mean | machine precision |
+| Mx `ε_zz` RMS | 1.09 % |
+| My `ε_zz` RMS | 0.26 % |
+
+Gate: `tests/test_recovery_anba.py`. Hollow foil with centres: [NACA 0018](/docs/recovery/naca).

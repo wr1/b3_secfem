@@ -1,0 +1,22 @@
+---
+title: Convention maps
+description: Maps that let secfem, ANBA, and gxbeam pose the same physical problem.
+---
+
+ANBA and gxbeam are solvers with their own conventions. `b3_secfem.adapters` translates angles and K order so the **same section** can be run in more than one of them.
+
+| helper | what it maps |
+|--------|----------------|
+| `anba_to_secfem_input` | ANBA `(card, fiber, plane)` → secfem `(card, β, α)`. Card unchanged. `β = plane`, `α = fiber`. |
+| `secfem_to_anba_input` | Inverse. For the compare script, not the SONATA path. |
+| `secfem_from_gxbeam_theta` | gxbeam `theta` → `(β, α) = (0, deg(theta))`. |
+| `to_anba_order` / `to_gxbeam_order` / `from_gxbeam_order` | K index permutation only. |
+| `swap23` | Relabel 2↔3. A tool, not the drop-in. |
+
+Worked example: rectangle, same orthotropic card, ANBA `(fiber, plane) = (90, 0)` (spanwise UD).
+
+- **ANBA** — send the card as written, `fiber=90`, `plane=0`.
+- **secfem** — `place = anba_to_secfem_input(card, 90, 0)` → `(β, α) = (0, 90)`, same card.
+- **gxbeam** — `theta` is `α` only. K comes back in gxbeam order; `to_gxbeam_order` / `from_gxbeam_order` for comparison.
+
+See [ANBA](/docs/solvers/anba) and [gxbeam](/docs/solvers/gxbeam).

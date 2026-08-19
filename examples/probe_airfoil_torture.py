@@ -176,7 +176,7 @@ def main() -> int:
     ec_b3 = np.asarray(res.elastic_center)  # compat alias for mass
 
     # ── ANBA4 ─────────────────────────────────────────────────────────────────
-    fiber_orient = 90.0 - per_cell_alpha       # ANBA convention: fiber=90 → fibre along z
+    fiber_orient = per_cell_alpha              # same zero: fiber = α, plane = β
     plane_orient = np.zeros(n_cells)
     anba = anba_section_from_arrays(
         coords, quads,

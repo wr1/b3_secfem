@@ -74,6 +74,7 @@ def test_solve_explicit_backend_fenicsx_kwarg(tmp_path):
     # We only need the module to be importable; the actual heavy test that
     # exercises a full solve lives in test_iso_rectangle.py (which we can
     # also call with the kwarg).
+    pytest.importorskip("dolfinx")
     from dolfinx import mesh as dmesh
     from mpi4py import MPI
 

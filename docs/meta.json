@@ -1,0 +1,16 @@
+{
+  "title": "b3_secfem",
+  "pages": [
+    "index",
+    "---Conventions---",
+    "...conventions",
+    "---Theory---",
+    "...theory",
+    "---Other solvers---",
+    "...solvers",
+    "---Recovery---",
+    "...recovery",
+    "---Validation---",
+    "...validation"
+  ]
+}

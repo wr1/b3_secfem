@@ -18,15 +18,19 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit"]
+dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit", "numba>=0.59"]
+# Optional fast path for mfem bulk assembly (falls back to numpy bulk / python integrator).
+numba = ["numba>=0.59"]
 # airfoilmesh is the sibling ``b3_af`` package (not published to PyPI). The
-# airfoil-section tests skip when it is absent, so it is opt-in: install with
-# ``pip install -e ../b3_af`` (see Makefile) to exercise them locally.
-airfoil = ["airfoilmesh"]
-# Install with: uv pip install --only-binary=:all: 'mfem>=4.8'  (only the 4.8
-# wheels are published for cp312; older versions are sdist-only and need a
-# native MFEM toolchain). Then re-pin numpy: uv pip install 'numpy<2'.
-mfem = ["mfem>=4.8", "scipy>=1.10"]  # PyMFEM serial + scipy for the singular nullspace solves
+# airfoil-section tests skip when it is absent, so it stays OUT of the extras:
+# a hard ``b3_af`` requirement is unsatisfiable in any workspace that does not
+# ship b3_af (e.g. non-se b3 clients), breaking their universal `uv sync`.
+# Install it directly to exercise those tests: ``pip install -e ../b3_af``
+# (see Makefile), or rely on it already being a workspace member upstream.
+# mfem + scipy are now core dependencies (the wheel-only, no-system-deps
+# backend); this extra remains as a no-op alias so ``b3_secfem[mfem]``
+# installs keep working.
+mfem = ["mfem>=4.8", "scipy>=1.10"]
 
 [project.scripts]
 b3_secfem = "b3_secfem.cli:main"
@@ -51,6 +55,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests gate dolfinx imports behind pytest.importorskip(), so the heavy

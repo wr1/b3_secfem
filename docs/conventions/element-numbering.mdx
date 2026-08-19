@@ -1,0 +1,18 @@
+---
+title: Element numbering
+description: Part of step 1 (section). CCW from +sec_3, then the dolfinx quad permutation.
+---
+
+This is not a fourth frame. Winding is how the mesh is numbered in the [section](/docs/conventions/section-frame).
+
+Positive area is CCW when looking along `−sec_3` (from `+z`). That is the same right-hand rule as the section frame.
+
+<img src="/figures/element_winding.png" alt="meshio CCW quad vs dolfinx tensor-product numbering" />
+
+1. gxbeam / meshio store a quad as BL → BR → TR → TL.
+2. `mesh.from_gxbeam_vtu` computes the signed shoelace area and flips any cell with negative area (`[0, 3, 2, 1]`).
+3. It then permutes `[0, 3, 1, 2]` into dolfinx 0.10 tensor-product order: BL → TL → BR → TR.
+
+Triangles are CCW from `+z` with **no** extra permutation.
+
+A reversed winding silently inverts the Jacobian. If a section looks inside-out or has negative areas in the log, check this page before the material angles.

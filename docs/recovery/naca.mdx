@@ -1,0 +1,26 @@
+---
+title: NACA 0018
+description: Hollow station — σ, ε, and centres vs ANBA.
+---
+
+Same hollow 0018 as the [three-way campaign](/docs/validation/three-way): chord 1 m, glass-biax skin, carbon-UD spar caps, one biax web at 35 % chord. Ply 0° = spanwise → secfem `α = 90`, ANBA `fiber = 90`; `β` = shell tangent. Filled markers are secfem centres (tension / mass / shear); open markers are ANBA centres from `K` / `M`.
+
+| | secfem | ANBA |
+|---|---|---|
+| mass centre x | 0.446 | 0.446 |
+| shear centre x | 0.299 | 0.328 (from `K`, not PD) |
+| `K[Fz,Fz]` | +1.669e9 | **−1.628e9** |
+
+Stage-1 `σ_zz` and `ε_zz` on secfem, centres on every panel:
+
+<img src="/figures/recovery/naca_sigma_stage1.png" alt="NACA 0018 secfem Stage-1 sigma_zz with centres" />
+
+<img src="/figures/recovery/naca_eps_stage1.png" alt="NACA 0018 secfem Stage-1 epsilon_zz with centres" />
+
+ANBA vs secfem on the same fields. Mean `σ_zz` under Fz still matches (both integrate to unit Fz). Mx `σ_zz` RMS is **73 %**; Fz `ε_zz` mean is **43 %**. ANBA `K` on this multi-region foil is a [known failed run](/docs/validation/three-way) — the overlay is the residual, not a convention pin.
+
+<img src="/figures/recovery/naca_sigma_compare.png" alt="NACA 0018 secfem vs ANBA Stage-1 sigma_zz with centres" />
+
+<img src="/figures/recovery/naca_eps_compare.png" alt="NACA 0018 secfem vs ANBA Stage-1 epsilon_zz with centres" />
+
+Rectangle pins (where ANBA `K` is PD): [Stress](/docs/recovery/stress), [Strain](/docs/recovery/strain).

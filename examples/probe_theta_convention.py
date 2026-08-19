@@ -1,9 +1,9 @@
 """Probe what gxbeam's per-element ``theta`` rotates relative to b3_secfem.
 
 b3_secfem has two angles:
-  * ``beta_deg``  — fibre rotation about the beam axis z. β=0 → fibre along z.
+  * ``beta_deg``  — rotation about +z. At α=0 this is the in-plane fibre angle.
   * ``alpha_deg`` — fibre tilt out of beam axis toward the section plane.
-                    α=0 → fibre along z. α=90 → fibre fully in the section.
+                    α=0 → fibre in the section. α=90 → fibre along −z.
 
 gxbeam_section has one angle ``theta`` per element. The cross-check showed
 that at θ=π/4 gxbeam's K[Fz,Fz] drops 8× — incompatible with rotation about

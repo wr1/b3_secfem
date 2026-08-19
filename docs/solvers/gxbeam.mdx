@@ -1,0 +1,13 @@
+---
+title: gxbeam
+description: gxbeam_section is a solver with its own force order and theta convention.
+---
+
+gxbeam is a section solver (Julia / `gxbeam_section`), not a layer on secfem. It shares the section plane (`x, y`, `z` out) but not the force order or the 2/3 placement at `α = 90`.
+
+- Per-element `theta` is fibre tilt only. **`θ = 0` is fibre along the beam** (secfem `α = 90`, ANBA `fiber = 90`). `θ = π/2` is fibre in the section. `β` is not a gxbeam input.
+- K order is `[F1=Fz, F2=Fx, F3=Fy, M1=Mz, M2=Mx, M3=My]`. Compare after `to_gxbeam_order` / `from_gxbeam_order`.
+- At `α = 90` raw gxbeam puts E2 on the beam; the existing 2↔3 bridge on the **gxbeam** side closes Fz/Mx/My. That bridge is a convention map, not a change to either solver's native `R`.
+- Mid-α residual vs secfem is a rotation-axis map, not 2/3.
+
+See [convention maps](/docs/solvers/adapters).

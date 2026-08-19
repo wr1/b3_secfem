@@ -48,6 +48,7 @@ from b3_secfem import (
     OrthotropicMaterial,
     RegionMat,
     SectionInput,
+    assemble_resultants_from_sigma,
     recover_unit_load_strains,
     solve,
 )
@@ -67,47 +68,6 @@ def _carbon_ud():
         G12=5e9, G13=5e9, G23=3.5e9,
         nu12=0.3, nu13=0.3, nu23=0.4, rho=1600.0, name="carbon_ud",
     )
-
-
-def _assemble_resultants_from_sigma(
-    sigma_arr: np.ndarray,
-    mesh,
-    C_func,
-) -> np.ndarray:
-    """Re-compute the 6 generalised-force resultants from a recovered sigma field.
-
-    Uses exactly the same integration formulas as solver._assemble_resultants.
-    This makes the identity check a true end-to-end verification of the
-    recovered stress fields.
-    """
-    import ufl
-    from dolfinx import fem
-
-    n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
-    assert sigma_arr.shape == (n_cells, 6)
-
-    # Project the numpy array back into a DG0 tensor so we can reuse the
-    # exact UFL forms the solver trusts.
-    Q = fem.functionspace(mesh, ("DG", 0, (6,)))
-    sig_func = fem.Function(Q, name="sigma_recovered")
-    sig_func.x.array[:] = sigma_arr.ravel()
-    sig_func.x.scatter_forward()
-
-    x = ufl.SpatialCoordinate(mesh)
-    R = np.zeros(6)
-    sigma = ufl.as_vector([sig_func[i] for i in range(6)])
-
-    forms = [
-        sigma[4],                                  # Vx
-        sigma[3],                                  # Vy
-        sigma[2],                                  # Fz
-        x[1] * sigma[2],                           # Mx
-        -x[0] * sigma[2],                          # My  (right-hand rule about y)
-        x[0] * sigma[3] - x[1] * sigma[4],         # Mz
-    ]
-    for a, integrand in enumerate(forms):
-        R[a] = float(fem.assemble_scalar(fem.form(integrand * ufl.dx)))
-    return R
 
 
 def main() -> int:
@@ -152,7 +112,7 @@ def main() -> int:
     labels = ["Fx", "Fy", "Fz", "Mx", "My", "Mz"]
     for k in range(6):
         # ul.sigma[k] is the (n_cells, 6) Voigt stress under unit load k
-        recovered_R[k] = _assemble_resultants_from_sigma(ul.sigma[k], res.mesh, res.C_func)
+        recovered_R[k] = assemble_resultants_from_sigma(ul.sigma[k], res.mesh)
 
     print("Recovered 6x6 load matrix (rows = applied unit load, columns = integrated resultants):")
     print("        " + "  ".join(f"{lab:>12}" for lab in labels))

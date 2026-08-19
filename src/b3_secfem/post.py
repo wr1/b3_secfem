@@ -14,8 +14,17 @@ def compute_centres(
 
     - Tension centre (axial-stiffness / elastic centroid):
           (xT, yT) = (int E33 x dA, int E33 y dA) / int E33 dA
-      where E33 is the (3, 3) component of the rotated stiffness. This is
-      the point neutral axes pass through for pure bending (no net axial force).
+      where E33 is the (3, 3) component of the rotated *local* stiffness tensor.
+      This is the point neutral axes pass through for pure bending — but only
+      *exactly* for a homogeneous section. It weights by the raw ``E33``
+      coefficient, whereas the assembled ``K`` (axial force / bending coupling)
+      effectively weights by the section's engineering axial modulus, which
+      includes the in-plane Poisson/warping relief solved by the cell problem.
+      For a heterogeneous, anisotropic section the two weightings differ
+      slightly (~1%), so this ``E33``-weighted centre does not exactly zero the
+      ``K[Fz, M]`` coupling. The K-self-consistent neutral axis (where it does)
+      is ``SectionResult.elastic_center_decoupling``; the two coincide to machine
+      precision for a single isotropic material.
     - Mass centre (centroid of mass / rho):
           (xM, yM) = (int rho x dA, int rho y dA) / int rho dA
     - Elastic centre: alias for mass centre (kept for backward compat in v0.x).
@@ -72,6 +81,12 @@ def to_gxbeam_order(K: np.ndarray) -> np.ndarray:
     gxbeam: F1 = axial = Fz, F2 = Fx, F3 = Fy, M1 = Mz, M2 = Mx, M3 = My.
     """
     perm = np.array([2, 0, 1, 5, 3, 4])
+    return K[np.ix_(perm, perm)]
+
+
+def from_gxbeam_order(K: np.ndarray) -> np.ndarray:
+    """Permute gxbeam [F1, F2, F3, M1, M2, M3] → [Fx, Fy, Fz, Mx, My, Mz]."""
+    perm = np.array([1, 2, 0, 4, 5, 3])
     return K[np.ix_(perm, perm)]
 
 

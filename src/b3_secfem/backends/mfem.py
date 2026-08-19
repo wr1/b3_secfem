@@ -17,6 +17,24 @@ orthotropic rectangles (see tests/test_backend_comparison.py).
 Not yet ported: strain/stress field recovery (``recover_strains``) and the
 input-cell-order remap needed for ``per_cell_material`` on dolfinx-renumbered
 meshes (region-tagged and uniform sections are fine).
+
+**Cannot yet read a laminate section mesh (2026-07-13).** MFEM's XDMF reader takes
+only a single grid::
+
+    Error: Couldn't read file .../section.xdmf as xdmf
+    XDMF reader: Only supports one grid right now.
+
+``b3_af.afmesh`` writes one grid per region tag (one per unique material+angle pair),
+so every real blade section is multi-grid and this backend rejects it outright. It
+therefore cannot currently stand in for fenicsx in ``b3_invsec`` — which was the reason
+to want it, since fenicsx's FFCx JIT makes each worker process heavy to start.
+
+To make it usable, in rough order of effort:
+  1. multi-grid XDMF read (or read the mesh once and apply cell tags separately);
+  2. ``recover_strains`` — ``b3_invsec.evaluate`` needs the 7 unit-load strain fields,
+     not just K/M.
+Until (1) and (2) land, ``solve(inp, backend="mfem")`` works only on single-region
+meshes.
 """
 
 from __future__ import annotations
@@ -281,9 +299,15 @@ if _MFEM_AVAILABLE:
                 Bu = self._operator(el, trans, ip, self.trial_kind, dref, dphys, shp)
                 acc += (Bt.T @ (C_local @ Bu)) * w
 
-            for r in range(vdim * ndof):
-                for c in range(vdim * ndof):
-                    elmat[r, c] = acc[r, c]
+            # Bulk write into MFEM DenseMatrix. GetDataArray is a (H, W) view
+            # (column-major storage under the hood); assigning the whole block
+            # avoids an O(ndof^2) pure-Python double loop on every element.
+            view = elmat.GetDataArray()
+            if getattr(view, "shape", None) == acc.shape:
+                view[:, :] = acc
+            else:
+                flat = np.asarray(view).reshape(-1, order="F")
+                flat[:] = acc.ravel(order="F")
 
     class StiffnessIntegrator(_VoigtFormIntegrator):
         """In-plane stiffness ∫ eps_xy(v)^T C eps_xy(u) dA (the E operator)."""
@@ -343,10 +367,20 @@ def solve(inp: SectionInput) -> SectionResult:
     fec = mfem.H1_FECollection(inp.degree, mesh.Dimension())
     fes = mfem.FiniteElementSpace(mesh, fec, 3)
 
-    # Section operators (one integrator, three operator pairs).
-    E = _assemble_voigt_form(C_per_cell, fes, "xy", "xy").tocsc()
-    Cmat = _assemble_voigt_form(C_per_cell, fes, "xy", "z").tocsc()
-    Mmat = _assemble_voigt_form(C_per_cell, fes, "z", "z").tocsc()
+    # Section operators. Bulk path tabulates geometry once and reuses for all three.
+    from .bulk_assemble import resolve_assemble_mode, tabulate_fes
+
+    mode = resolve_assemble_mode()
+    tables = tabulate_fes(mesh, fes) if mode != "python" else None
+    E = _assemble_voigt_form(
+        C_per_cell, fes, "xy", "xy", mesh=mesh, tables=tables, mode=mode
+    ).tocsc()
+    Cmat = _assemble_voigt_form(
+        C_per_cell, fes, "xy", "z", mesh=mesh, tables=tables, mode=mode
+    ).tocsc()
+    Mmat = _assemble_voigt_form(
+        C_per_cell, fes, "z", "z", mesh=mesh, tables=tables, mode=mode
+    ).tocsc()
 
     # Coordinates, rigid null space, single KKT factorisation reused below.
     _sfes, xs, ys = _scalar_dof_coords(mesh, inp.degree)
@@ -397,22 +431,69 @@ def solve(inp: SectionInput) -> SectionResult:
         K_section_xy=K_section_xy,
         u_solutions=u_solutions,
         inplane_shear_warping=w_xy,
-        C_func=None,
+        # Backend-specific recovery payload (the documented use of C_func):
+        # exactly the strain-field specs that built R, so recover_strains
+        # reproduces the R-consistent basis fields by construction.
+        C_func={
+            "C_per_cell": C_per_cell,
+            "fes": fes,
+            "a_dofs": a_dofs,
+            "b_dofs": b_dofs,
+        },
         mesh=mesh,
         backend="mfem",
     )
 
 
 def recover_strains(result: SectionResult):
+    """Per-cell Voigt strain/stress for the 6 kinematic basis fields (mfem).
+
+    Mirrors ``recovery.recover_strains`` (fenicsx): each field i is the
+    cell-averaged (DG0) total strain ``eps_total^(i) = eps_z(a_i) +
+    eps_xy(b_i)`` — the same integrand ``_assemble_R_S`` used to build R,
+    evaluated with the same quadrature, so the recovered fields are
+    R-consistent by construction. Returns ``StrainField`` with
+    epsilon/sigma of shape (6, n_cells, 6) in mfem element order (== input
+    cell order; ``_load_mfem_mesh`` preserves it).
+    """
+    from ..recovery import StrainField
+
     if getattr(result, "backend", "") != "mfem":
         raise ValueError("recover_strains called on non-mfem result")
-    raise NotImplementedError(
-        "mfem strain/stress field recovery is not ported yet (K/M/centres are). "
-        "Use the fenicsx backend for recover_strains / recover_unit_load_strains."
-    )
+    state = result.C_func
+    if not isinstance(state, dict) or "a_dofs" not in state:
+        raise ValueError(
+            "result lacks mfem recovery state (was it constructed manually?)"
+        )
+    mesh = result.mesh
+    fes = state["fes"]
+    C_per_cell = state["C_per_cell"]
+    a_dofs = state["a_dofs"]
+    b_dofs = state["b_dofs"]
 
+    n_cells = mesh.GetNE()
+    eps = np.zeros((6, n_cells, 6))
+    sig = np.zeros((6, n_cells, 6))
+    areas = np.zeros(n_cells)
 
-# (identical pattern for recover_unit_load_strains, the two plot helpers, etc.)
+    for e in range(n_cells):
+        acc = np.zeros((6, 6))  # (mode, voigt)
+        area = 0.0
+        for w, _x, _y, dN, N, idx, sign in _iter_quad(mesh, fes, e):
+            Bxy = _voigt_strain_from_dshape(dN)
+            Bz = _voigt_epsz_from_shape(N)
+            for i in range(6):
+                acc[i] += (
+                    Bz @ (sign * a_dofs[i][idx]) + Bxy @ (sign * b_dofs[i][idx])
+                ) * w
+            area += w
+        eps[:, e, :] = acc / area
+        areas[e] = area
+        C_local = C_per_cell[e]
+        for i in range(6):
+            sig[i, e, :] = C_local @ eps[i, e, :]
+
+    return StrainField(epsilon=eps, sigma=sig, cell_areas=areas)
 
 
 def assemble_stiffness_matrix(
@@ -441,13 +522,7 @@ def assemble_stiffness_matrix(
     # _voigt_strain_from_dshape). Default ordering is fine here.
     fes = mfem.FiniteElementSpace(mesh, fec, 3)
 
-    a = mfem.BilinearForm(fes)
-    a.AddDomainIntegrator(StiffnessIntegrator(C_per_cell))
-    a.Assemble()
-    a.Finalize()
-
-    Asp = _mfem_spmat_to_scipy(a.SpMat())
-    return Asp
+    return _assemble_voigt_form(C_per_cell, fes, "xy", "xy", mesh=mesh)
 
 
 # =============================================================================
@@ -561,13 +636,46 @@ def _orthonormal_rigid(fes, xs, ys) -> list:
     return [Q[:, k].copy() for k in range(Q.shape[1])]
 
 
-def _assemble_voigt_form(C_per_cell, fes, test_kind: str, trial_kind: str):
-    """Assemble ∫ B_test^T C B_trial dA as a scipy CSR via _VoigtFormIntegrator."""
-    a = mfem.BilinearForm(fes)
-    a.AddDomainIntegrator(_VoigtFormIntegrator(C_per_cell, test_kind, trial_kind))
-    a.Assemble()
-    a.Finalize()
-    return _mfem_spmat_to_scipy(a.SpMat())
+def _assemble_voigt_form(
+    C_per_cell,
+    fes,
+    test_kind: str,
+    trial_kind: str,
+    *,
+    mesh=None,
+    tables=None,
+    mode: str | None = None,
+):
+    """Assemble ∫ B_test^T C B_trial dA as a scipy CSR.
+
+    Default path is bulk numba/numpy (``B3_SECFEM_MFEM_ASSEMBLE``); set
+    ``mode="python"`` for the original ``PyBilinearFormIntegrator`` callback.
+    """
+    from .bulk_assemble import assemble_voigt_bulk, resolve_assemble_mode
+
+    m = mode if mode is not None else resolve_assemble_mode()
+    if m == "python":
+        a = mfem.BilinearForm(fes)
+        a.AddDomainIntegrator(_VoigtFormIntegrator(C_per_cell, test_kind, trial_kind))
+        a.Assemble()
+        a.Finalize()
+        return _mfem_spmat_to_scipy(a.SpMat())
+
+    if mesh is None:
+        # FiniteElementSpace keeps a Mesh pointer; PyMFEM exposes GetMesh().
+        mesh = fes.GetMesh() if hasattr(fes, "GetMesh") else None
+        if mesh is None:
+            raise RuntimeError("bulk assemble needs mesh= or fes.GetMesh()")
+    eng = "numba" if m == "numba" else "numpy"
+    return assemble_voigt_bulk(
+        C_per_cell,
+        mesh,
+        fes,
+        test_kind,  # type: ignore[arg-type]
+        trial_kind,  # type: ignore[arg-type]
+        engine=eng,  # type: ignore[arg-type]
+        tables=tables,
+    )
 
 
 def _make_kkt_solver(E, nullvecs):

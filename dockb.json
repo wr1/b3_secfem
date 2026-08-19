@@ -1,0 +1,6 @@
+{
+  "name": "b3_secfem",
+  "title": "b3_secfem",
+  "description": "2D composite cross-section solver: K, M, centres, recovery. FEniCSx production path, optional MFEM.",
+  "github": { "url": "https://github.com/wr1/b3_secfem", "branch": "main" }
+}

@@ -104,7 +104,15 @@ def recover_strains(result: SectionResult) -> StrainField:
     For the actual strain and stress distributions under the six *applied*
     unit load cases (Fx=1, Fy=1, Fz=1, Mx=1, My=1, Mz=1) use
     ``recover_unit_load_strains`` instead.
+
+    Dispatches on ``result.backend``: mfem results route to the mfem
+    backend's own recovery (same contract, same cell ordering semantics).
     """
+    if getattr(result, "backend", "fenicsx") == "mfem":
+        from .backends import mfem as _mfem_backend
+
+        return _mfem_backend.recover_strains(result)
+
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_vector
@@ -155,6 +163,53 @@ def recover_strains(result: SectionResult) -> StrainField:
             sigM[i, k, :] = C_arrM[k] @ eps[i, k, :]
 
     return StrainField(epsilon=eps, sigma=sig, sigma_mat=sigM, cell_areas=cell_areas)
+
+
+def assemble_resultants_from_sigma(
+    sigma: np.ndarray,
+    mesh: Any,
+    cell_areas: np.ndarray | None = None,
+) -> np.ndarray:
+    """Integrate one recovered Voigt stress field to [Fx, Fy, Fz, Mx, My, Mz].
+
+    ``sigma`` is shape ``(n_cells, 6)``. Integrands match
+    ``solver._assemble_resultants``:
+
+        Fx = ∫ σ_xz dA,  Fy = ∫ σ_yz dA,  Fz = ∫ σ_zz dA,
+        Mx = ∫ y σ_zz dA, My = ∫ −x σ_zz dA,
+        Mz = ∫ (x σ_yz − y σ_xz) dA.
+
+    ``cell_areas`` is accepted for API symmetry and unused: the UFL forms
+    integrate against the mesh measure.
+    """
+    del cell_areas
+    import ufl
+    from dolfinx import fem
+
+    n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+    if sigma.shape != (n_cells, 6):
+        msg = f"sigma shape {sigma.shape} != ({n_cells}, 6)"
+        raise ValueError(msg)
+
+    Q = fem.functionspace(mesh, ("DG", 0, (6,)))
+    sig_func = fem.Function(Q, name="sigma_recovered")
+    sig_func.x.array[:] = np.asarray(sigma, dtype=float).ravel()
+    sig_func.x.scatter_forward()
+
+    x = ufl.SpatialCoordinate(mesh)
+    sv = ufl.as_vector([sig_func[i] for i in range(6)])
+    forms = [
+        sv[4],
+        sv[3],
+        sv[2],
+        x[1] * sv[2],
+        -x[0] * sv[2],
+        x[0] * sv[3] - x[1] * sv[4],
+    ]
+    R = np.zeros(6)
+    for a, integrand in enumerate(forms):
+        R[a] = float(fem.assemble_scalar(fem.form(integrand * ufl.dx)))
+    return R
 
 
 def _cell_areas(mesh: Any) -> np.ndarray:
