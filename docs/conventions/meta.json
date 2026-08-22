@@ -3,6 +3,7 @@
   "pages": [
     "walkthrough",
     "section-frame",
+    "element-numbering",
     "material-card",
     "placement",
     "voigt-and-loads"

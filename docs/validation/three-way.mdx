@@ -3,7 +3,7 @@ title: Three-way campaign
 description: secfem, ANBA, and gxbeam on the same physical problems — ladder then a NACA 0018 station.
 ---
 
-Ran with the [same-problem map](/docs/solvers/adapters): same card; `β = plane`, `α = fiber`; gxbeam `θ = 0` is fibre on the beam (so `θ = 0` ↔ secfem `α = 90`). Quads are forced CCW before ANBA/gxbeam (secfem already flips in `from_gxbeam_vtu`).
+Ran with the [same-problem map](/docs/solvers/adapters): same card; `β = plane`, `α = fiber`; gxbeam `θ = 0` is fibre in the section (so `θ = 0` ↔ secfem `α = 0`; `θ = π/2` ↔ `α = 90`). Quads are forced CCW before ANBA/gxbeam (secfem already flips in `from_gxbeam_vtu`).
 
 ```text
 micromamba run -n b3secfem python examples/validation/three_way.py
@@ -21,7 +21,7 @@ Stage 1 (Fz, Mx, My) after the map:
 | iso rectangle | 0.00 % | 0.00 % | Fy 0.4 % vs ANBA, 8 % vs gxbeam |
 | iso ring | 0.00 % | 0.00 % | all six DOF ≤ 0.3 % vs both |
 | ASYM fibre on beam | 0.00 % | 0.00 % | EA = E1 A; Fy 27 % vs ANBA |
-| ASYM fibre along +x | 0.00 % | 0.00 % | gxbeam at `θ = 90` with the 2↔3 bridge |
+| ASYM fibre along +x | 0.00 % | 0.00 % | gxbeam at `θ = 0` with the 2↔3 bridge |
 | UD ellipse fibre on beam | 0.00 % | 0.00 % | Fy 24 % vs ANBA; gxbeam all ≤ 0.5 % |
 
 <img src="/figures/compare/kdiag_heatmap.png" alt="percent K-diagonal mismatch, cases by DOF, vs ANBA and vs gxbeam" />
@@ -36,7 +36,7 @@ gxbeam has no `β`. On a rectangle that only needs `α`, fibre-on-beam UD matche
 
 ## NACA 0018 station
 
-Hollow 0018, chord 1 m, glass-biax skin, carbon-UD spar caps, one biax web at 35 % chord. 136 quads. Ply 0° = spanwise → secfem `α = 90`, ANBA `fiber = 90`, gxbeam `θ = 0`; `β` = shell tangent (secfem and ANBA only).
+Hollow 0018, chord 1 m, glass-biax skin, carbon-UD spar caps, one biax web at 35 % chord. 136 quads. Ply 0° = spanwise → secfem `α = 90`, ANBA `fiber = 90`, gxbeam `θ = π/2`; `β` = shell tangent (secfem and ANBA only).
 
 <img src="/figures/compare/naca_centers.png" alt="NACA 0018 mesh with shear and mass centres from each solver" />
 
