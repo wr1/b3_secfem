@@ -123,3 +123,28 @@ def test_cli_parses_backend(monkeypatch, tmp_path: Path):
     rc = main([str(p), "--backend", "mfem"])
     assert rc == 0
     assert captured.get("backend_kw") == "mfem"
+
+
+def test_material_and_strain_fields_import_from_root():
+    from b3_secfem import Material, StrainField, UnitLoadStrainField
+    from b3_secfem.materials import IsotropicMaterial, OrthotropicMaterial
+
+    assert "Material" in b3_secfem.__all__
+    assert "StrainField" in b3_secfem.__all__
+    assert "UnitLoadStrainField" in b3_secfem.__all__
+    assert b3_secfem.Material is Material
+    assert Material == IsotropicMaterial | OrthotropicMaterial
+    assert StrainField is b3_secfem.StrainField
+    assert UnitLoadStrainField is b3_secfem.UnitLoadStrainField
+
+
+def test_strain_fields_reject_non_ndarray():
+    """Pydantic type-check: list is not np.ndarray (arbitrary_types_allowed)."""
+    from pydantic import ValidationError
+    from b3_secfem import StrainField, UnitLoadStrainField
+
+    with pytest.raises(ValidationError):
+        StrainField(epsilon=[0], sigma=[0], cell_areas=[0])
+    with pytest.raises(ValidationError):
+        UnitLoadStrainField(epsilon=[0], sigma=[0], cell_areas=[0])
+
