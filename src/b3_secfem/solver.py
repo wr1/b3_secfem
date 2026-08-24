@@ -60,7 +60,7 @@ from .inertia import assemble_mass
 from .mesh import read_xdmf
 from .post import compute_centres
 from .result import SectionResult
-from .rotation3d import rotate_stiffness_6x6
+from .rotation3d import _bond_T, _rotation_matrix_3x3, rotate_stiffness_6x6
 from .spaces import (
     fill_per_cell_density,
     fill_per_cell_stiffness,
@@ -392,8 +392,11 @@ def _per_cell_arrays(
         )
         for k, mat in enumerate(inp.per_cell_material):
             rho[k]  = mat.rho
-            Cmat[k] = mat.C_local()
-            C[k]    = rotate_stiffness_6x6(Cmat[k], beta[k], alpha[k])
+            # Material-local stress from global strain needs C_local @ T.T
+            # (T alone leaves Cmat unrotated, mismatching ANBA's local recovery).
+            T = _bond_T(_rotation_matrix_3x3(beta[k], alpha[k]))
+            Cmat[k] = mat.C_local() @ T.T
+            C[k]    = rotate_stiffness_6x6(mat.C_local(), beta[k], alpha[k])
         return C, Cmat, rho
 
     if inp.region_materials is None:
@@ -417,8 +420,9 @@ def _per_cell_arrays(
             msg = f"cell {k} has tag {tags_per_cell[k]} with no region material"
             raise KeyError(msg)
         rho[k]  = rm.material.rho
-        Cmat[k] = rm.material.C_local()
-        C[k]    = rotate_stiffness_6x6(Cmat[k], rm.beta_deg, rm.alpha_deg)
+        T = _bond_T(_rotation_matrix_3x3(rm.beta_deg, rm.alpha_deg))
+        Cmat[k] = rm.material.C_local() @ T.T
+        C[k]    = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
     return C, Cmat, rho
 
 
