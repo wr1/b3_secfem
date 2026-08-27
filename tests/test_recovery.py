@@ -178,7 +178,9 @@ def test_plot_unit_load_fields_writes_png(tmp_path):
     assert dest.is_file() and dest.stat().st_size > 0
 
 
-def _rotated_ortho_rectangle(tmp_path, beta_deg=20.0, alpha_deg=15.0, a=0.1, b=0.1, n=10):
+def _rotated_ortho_rectangle(
+    tmp_path, beta_deg=20.0, alpha_deg=15.0, a=0.1, b=0.1, n=10
+):
     """Homogeneous rectangle of an off-axis (rotated) orthotropic ply.
 
     A nonzero, non-multiple-of-90 (beta, alpha) is essential here: it is
@@ -208,7 +210,9 @@ def _rotated_ortho_rectangle(tmp_path, beta_deg=20.0, alpha_deg=15.0, a=0.1, b=0
     write_xdmf(path, m)
     inp = SectionInput(
         mesh_path=path,
-        region_materials={1: RegionMat(material=mat, beta_deg=beta_deg, alpha_deg=alpha_deg)},
+        region_materials={
+            1: RegionMat(material=mat, beta_deg=beta_deg, alpha_deg=alpha_deg)
+        },
         linear_solver="lu",
     )
     return mat, path, inp
