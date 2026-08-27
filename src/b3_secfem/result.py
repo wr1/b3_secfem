@@ -67,6 +67,7 @@ class SectionResult(BaseModel):
     for the 7th in-plane-shear cell problem. Used by viz.plot_warping."""
     C_func: Any | None = None
     Cmat_func: Any | None = None
+    Clocal_func: Any | None = None
     mesh: Any | None = None
     oci: np.ndarray
 

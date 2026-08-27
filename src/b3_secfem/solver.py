@@ -100,7 +100,7 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     mesh, cell_tags = _load_mesh(inp)
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
 
-    C_per_cell, Cmat_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, cell_tags)
+    C_per_cell, Cmat_per_cell, Clocal_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, cell_tags)
 
     if inp.per_cell_material is not None:
         # Remap per-cell arrays from INPUT (spec) cell ordering to dolfinx
@@ -114,9 +114,10 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
         # diagonal disagrees with ANBA on multi-material sections.
         oci = np.asarray(mesh.topology.original_cell_index)
         if oci.shape == (n_cells,) and not np.array_equal(oci, np.arange(n_cells)):
-            rho_per_cell  = rho_per_cell[oci]
-            C_per_cell    = C_per_cell[oci]
-            Cmat_per_cell = Cmat_per_cell[oci]
+            rho_per_cell    = rho_per_cell[oci]
+            C_per_cell      = C_per_cell[oci]
+            Cmat_per_cell   = Cmat_per_cell[oci]
+            Clocal_per_cell = Clocal_per_cell[oci]
     else:
         oci = np.arange(n_cells, dtype=np.int_)
 
@@ -129,6 +130,9 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
 
     Cmat_func = fem.Function(Q, name="Cmat_bar")
     fill_per_cell_stiffness(Cmat_func, Cmat_per_cell)
+
+    Clocal_func = fem.Function(Q, name="Clocal_bar")
+    fill_per_cell_stiffness(Clocal_func, Clocal_per_cell)
 
     rho_func = fem.Function(R_space, name="rho")
     fill_per_cell_density(rho_func, rho_per_cell)
@@ -246,6 +250,7 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
         inplane_shear_warping=w_xy,
         C_func=C_func,
         Cmat_func=Cmat_func,
+        Clocal_func=Clocal_func,
         mesh=mesh,
         oci=oci,
     )
@@ -374,9 +379,10 @@ def _load_mesh(inp: SectionInput):
 
 def _per_cell_arrays(
     inp: SectionInput, n_cells: int, cell_tags: Any | None
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     C = np.zeros((n_cells, 6, 6))
     Cmat = np.zeros((n_cells, 6, 6))
+    Clocal = np.zeros((n_cells, 6, 6))
     rho = np.zeros(n_cells)
 
     if inp.per_cell_material is not None:
@@ -395,9 +401,10 @@ def _per_cell_arrays(
             # Material-local stress from global strain needs C_local @ T.T
             # (T alone leaves Cmat unrotated, mismatching ANBA's local recovery).
             T = _bond_T(_rotation_matrix_3x3(beta[k], alpha[k]))
-            Cmat[k] = mat.C_local() @ T.T
+            Clocal[k] = mat.C_local()
+            Cmat[k] = Clocal[k] @ T.T
             C[k]    = rotate_stiffness_6x6(mat.C_local(), beta[k], alpha[k])
-        return C, Cmat, rho
+        return C, Cmat, Clocal, rho
 
     if inp.region_materials is None:
         msg = "no per-cell or region material specification"
@@ -421,9 +428,10 @@ def _per_cell_arrays(
             raise KeyError(msg)
         rho[k]  = rm.material.rho
         T = _bond_T(_rotation_matrix_3x3(rm.beta_deg, rm.alpha_deg))
-        Cmat[k] = rm.material.C_local() @ T.T
+        Clocal[k] = rm.material.C_local()
+        Cmat[k] = Clocal[k] @ T.T
         C[k]    = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
-    return C, Cmat, rho
+    return C, Cmat, Clocal, rho
 
 
 def _build_nullspace(V: Any):
