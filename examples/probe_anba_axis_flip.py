@@ -103,9 +103,9 @@ def main() -> int:
     write_gx_vtu(vtu, coords, quads, mat_props, theta_arr)
 
     # Reference: gxbeam
-    #K_gx_gxorder, *_ = _gxbeam_section_from_arrays(coords, quads, mat_props, theta_arr)
-    #perm_gx_to_nat = np.array([1, 2, 0, 4, 5, 3])
-    #K_gx = K_gx_gxorder[np.ix_(perm_gx_to_nat, perm_gx_to_nat)]
+    K_gx_gxorder, *_ = _gxbeam_section_from_arrays(coords, quads, mat_props, theta_arr)
+    perm_gx_to_nat = np.array([1, 2, 0, 4, 5, 3])
+    K_gx = K_gx_gxorder[np.ix_(perm_gx_to_nat, perm_gx_to_nat)]
 
     # b3_secfem
     info = from_gxbeam_vtu(vtu)
@@ -130,7 +130,7 @@ def main() -> int:
         print(f"  {'  └─ 1/S diagonal':<32} | "
               + " | ".join(f"{n}={v:>11.4e}" for n, v in zip(names, sd)))
 
-    #report("gxbeam", K_gx)
+    report("gxbeam", K_gx)
     report("b3_secfem", K_b3)
     print()
 
