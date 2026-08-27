@@ -7,7 +7,7 @@ engines. Single NACA airfoil mesh, but with:
     different, all ν's different — no transverse-isotropy symmetries
     that could mask rotation handling).
   * Four cell regions, each with a different odd fibre angle
-    (23°, −17°, 35°, −41°). No symmetry: NE, NW, SE, SW each get a
+    (23°, −17°, 35°, −41°). No symmetry: NE, NW, southeast, SW each get a
     different (material, theta) pair.
   * Mesh origin at chord centre (not at any of sc / tc / mc), so the
     raw K[Mz, Mz] picks up the shear-centre offset coupling.
