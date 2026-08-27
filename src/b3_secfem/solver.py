@@ -100,7 +100,9 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     mesh, cell_tags = _load_mesh(inp)
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
 
-    C_per_cell, Cmat_per_cell, Clocal_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, cell_tags)
+    C_per_cell, Cmat_per_cell, Clocal_per_cell, rho_per_cell = _per_cell_arrays(
+        inp, n_cells, cell_tags
+    )
 
     if inp.per_cell_material is not None:
         # Remap per-cell arrays from INPUT (spec) cell ordering to dolfinx
@@ -114,9 +116,9 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
         # diagonal disagrees with ANBA on multi-material sections.
         oci = np.asarray(mesh.topology.original_cell_index)
         if oci.shape == (n_cells,) and not np.array_equal(oci, np.arange(n_cells)):
-            rho_per_cell    = rho_per_cell[oci]
-            C_per_cell      = C_per_cell[oci]
-            Cmat_per_cell   = Cmat_per_cell[oci]
+            rho_per_cell = rho_per_cell[oci]
+            C_per_cell = C_per_cell[oci]
+            Cmat_per_cell = Cmat_per_cell[oci]
             Clocal_per_cell = Clocal_per_cell[oci]
     else:
         oci = np.arange(n_cells, dtype=np.int_)
@@ -397,13 +399,13 @@ def _per_cell_arrays(
             else np.zeros(n_cells)
         )
         for k, mat in enumerate(inp.per_cell_material):
-            rho[k]  = mat.rho
+            rho[k] = mat.rho
             # Material-local stress from global strain needs C_local @ T.T
             # (T alone leaves Cmat unrotated, mismatching ANBA's local recovery).
             T = _bond_T(_rotation_matrix_3x3(beta[k], alpha[k]))
             Clocal[k] = mat.C_local()
             Cmat[k] = Clocal[k] @ T.T
-            C[k]    = rotate_stiffness_6x6(mat.C_local(), beta[k], alpha[k])
+            C[k] = rotate_stiffness_6x6(mat.C_local(), beta[k], alpha[k])
         return C, Cmat, Clocal, rho
 
     if inp.region_materials is None:
@@ -426,11 +428,11 @@ def _per_cell_arrays(
         if rm is None:
             msg = f"cell {k} has tag {tags_per_cell[k]} with no region material"
             raise KeyError(msg)
-        rho[k]  = rm.material.rho
+        rho[k] = rm.material.rho
         T = _bond_T(_rotation_matrix_3x3(rm.beta_deg, rm.alpha_deg))
         Clocal[k] = rm.material.C_local()
         Cmat[k] = Clocal[k] @ T.T
-        C[k]    = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
+        C[k] = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
     return C, Cmat, Clocal, rho
 
 

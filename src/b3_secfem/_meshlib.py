@@ -81,7 +81,7 @@ def _write_quad_mesh(
         else:
             with io.XDMFFile(mesh.comm, str(path), "w") as xf:
                 xf.write_mesh(mesh)
-                
+
     return mesh
 
 

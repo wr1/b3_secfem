@@ -68,28 +68,30 @@ class OrthotropicMaterial(BaseModel):
         C = np.zeros((6, 6))
 
         # This is the secfem default and gives identical results, just might be a tad slower
-        #S_n = np.array(
+        # S_n = np.array(
         #    [
         #        [1.0 / E1, -nu21 / E2, -nu31 / E3],
         #        [-nu12 / E1, 1.0 / E2, -nu32 / E3],
         #        [-nu13 / E1, -nu23 / E2, 1.0 / E3],
         #    ]
-        #)
-        #C_n = np.linalg.inv(S_n)
-        #C[:3, :3] = C_n
+        # )
+        # C_n = np.linalg.inv(S_n)
+        # C[:3, :3] = C_n
 
-        delta = (1.0 - nu12*nu21 - nu23*nu32 - nu13*nu31 - 2.0*nu21*nu32*nu13) / (E1*E2*E3)
-        C[0, 0] = (1.0  - nu23*nu32) / (E2*E3*delta)
-        C[0, 1] = (nu12 + nu32*nu13) / (E1*E3*delta)
-        C[0, 2] = (nu13 + nu12*nu23) / (E1*E2*delta)
+        delta = (
+            1.0 - nu12 * nu21 - nu23 * nu32 - nu13 * nu31 - 2.0 * nu21 * nu32 * nu13
+        ) / (E1 * E2 * E3)
+        C[0, 0] = (1.0 - nu23 * nu32) / (E2 * E3 * delta)
+        C[0, 1] = (nu12 + nu32 * nu13) / (E1 * E3 * delta)
+        C[0, 2] = (nu13 + nu12 * nu23) / (E1 * E2 * delta)
 
         C[1, 0] = C[0, 1]
-        C[1, 1] = (1    - nu13*nu31) / (E1*E3*delta)
-        C[1, 2] = (nu23 + nu21*nu13) / (E1*E2*delta)
+        C[1, 1] = (1 - nu13 * nu31) / (E1 * E3 * delta)
+        C[1, 2] = (nu23 + nu21 * nu13) / (E1 * E2 * delta)
 
         C[2, 0] = C[0, 2]
         C[2, 1] = C[1, 2]
-        C[2, 2] = (1 - nu12*nu21) / (E1*E2*delta)
+        C[2, 2] = (1 - nu12 * nu21) / (E1 * E2 * delta)
         C[3, 3] = self.G23
         C[4, 4] = self.G13
         C[5, 5] = self.G12

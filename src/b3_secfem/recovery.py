@@ -57,7 +57,9 @@ class StrainField(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
-    epsilon_mat: np.ndarray  # (6, n_cells, 6) Voigt strain in local (material) coord sys
+    epsilon_mat: (
+        np.ndarray
+    )  # (6, n_cells, 6) Voigt strain in local (material) coord sys
     sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     sigma_mat: np.ndarray  # (6, n_cells, 6) Voigt stress in local (material) coord sys
     cell_areas: np.ndarray  # (n_cells,)
@@ -89,7 +91,9 @@ class UnitLoadStrainField(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
-    epsilon_mat: np.ndarray  # (6, n_cells, 6) Voigt strain in local (material) coord sys
+    epsilon_mat: (
+        np.ndarray
+    )  # (6, n_cells, 6) Voigt strain in local (material) coord sys
     sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     sigma_mat: np.ndarray  # (6, n_cells, 6) Voigt stress in local (material) coord sys
     cell_areas: np.ndarray  # (n_cells,)
@@ -130,15 +134,15 @@ def recover_strains(result: SectionResult) -> StrainField:
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     cell_areas = _cell_areas(mesh)
 
-    eps  = np.zeros((6, n_cells, 6))
+    eps = np.zeros((6, n_cells, 6))
     epsM = np.zeros((6, n_cells, 6))
-    sig  = np.zeros((6, n_cells, 6))
+    sig = np.zeros((6, n_cells, 6))
     sigM = np.zeros((6, n_cells, 6))
 
     x = ufl.SpatialCoordinate(mesh)
     DG0 = fem.functionspace(mesh, ("DG", 0))
     v = ufl.TestFunction(DG0)
-    C_arr  = Q_func.x.array.reshape(n_cells, 6, 6)
+    C_arr = Q_func.x.array.reshape(n_cells, 6, 6)
     C_arrM = Qmat_func.x.array.reshape(n_cells, 6, 6)
     C_arrLocal = (
         Qlocal_func.x.array.reshape(n_cells, 6, 6) if Qlocal_func is not None else None
@@ -166,7 +170,7 @@ def recover_strains(result: SectionResult) -> StrainField:
             eps[i, :, k_voigt] = b.array.copy() / cell_areas
 
         for k in range(n_cells):
-            sig[ i, k, :] = C_arr[k]  @ eps[i, k, :]
+            sig[i, k, :] = C_arr[k] @ eps[i, k, :]
             sigM[i, k, :] = C_arrM[k] @ eps[i, k, :]
             # eps_mat is the strain paired with sigma_mat: sigma_mat = C_local @
             # eps_mat, so eps_mat = C_local^-1 @ sigma_mat. Using the global
@@ -272,17 +276,17 @@ def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
         msg = "result lacks dolfinx state or basis-resultant R (was it constructed manually?)"
         raise ValueError(msg)
 
-    basis  = recover_strains(result)
-    eps_b  = basis.epsilon
+    basis = recover_strains(result)
+    eps_b = basis.epsilon
     epsM_b = basis.epsilon_mat
-    sig_b  = basis.sigma
+    sig_b = basis.sigma
     sigM_b = basis.sigma_mat
-    areas  = basis.cell_areas
+    areas = basis.cell_areas
 
     Gamma = np.linalg.solve(result.R, np.eye(6))  # column k = inv(R) @ e_k
-    eps_out  = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
+    eps_out = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
     epsM_out = np.einsum("ki,icv->kcv", Gamma.T, epsM_b)
-    sig_out  = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
+    sig_out = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
     sigM_out = np.einsum("ki,icv->kcv", Gamma.T, sigM_b)
 
     return UnitLoadStrainField(
