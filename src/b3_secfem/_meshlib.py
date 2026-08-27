@@ -117,9 +117,9 @@ def hollow_cylinder(
     R_o = R_mid + t / 2
     R_i = R_mid - t / 2
     A = np.pi * (R_o**2 - R_i**2)
-    I = np.pi * (R_o**4 - R_i**4) / 4.0
+    I_area = np.pi * (R_o**4 - R_i**4) / 4.0
     J = np.pi * (R_o**4 - R_i**4) / 2.0
-    return path, {"A": A, "I": I, "J": J, "R_mid": R_mid, "t": t}
+    return path, {"A": A, "I": I_area, "J": J, "R_mid": R_mid, "t": t}
 
 
 def solid_ellipse(
