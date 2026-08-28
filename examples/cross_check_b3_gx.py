@@ -160,7 +160,7 @@ def gen_ellipse_hollow(
 def gen_airfoil_solid(
     chord: float, thickness: float, n_chord: int, n_thick: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Solid (filled) NACA 00xx airfoil, mirrors tests/_meshlib.airfoil_solid."""
+    """Solid (filled) NACA 00xx airfoil, mirrors b3_secfem._meshlib.airfoil_solid."""
     eta = np.linspace(0.0, 1.0, n_chord + 1)
     half_t = (thickness / 0.2) * chord * (
         0.2969 * np.sqrt(eta) - 0.1260 * eta - 0.3516 * eta ** 2

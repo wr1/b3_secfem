@@ -362,7 +362,7 @@ def solve(inp: SectionInput) -> SectionResult:
         if tags is not None
         else None
     )
-    C_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, ct)
+    C_per_cell, _Cmat, _Clocal, rho_per_cell = _per_cell_arrays(inp, n_cells, ct)
 
     fec = mfem.H1_FECollection(inp.degree, mesh.Dimension())
     fes = mfem.FiniteElementSpace(mesh, fec, 3)

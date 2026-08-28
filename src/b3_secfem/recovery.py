@@ -59,6 +59,12 @@ class StrainField(BaseModel):
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
     sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     cell_areas: np.ndarray  # (n_cells,)
+    epsilon_mat: np.ndarray | None = None
+    """(6, n_cells, 6) Voigt strain in the local (material) frame, or None
+    when the backend did not supply C_local / C_mat."""
+    sigma_mat: np.ndarray | None = None
+    """(6, n_cells, 6) Voigt stress in the local (material) frame, or None
+    when the backend did not supply C_mat."""
 
 
 class UnitLoadStrainField(BaseModel):
@@ -89,6 +95,10 @@ class UnitLoadStrainField(BaseModel):
     epsilon: np.ndarray  # (6, n_cells, 6) Voigt strain (engineering shears)
     sigma: np.ndarray  # (6, n_cells, 6) Voigt stress
     cell_areas: np.ndarray  # (n_cells,)
+    epsilon_mat: np.ndarray | None = None
+    """(6, n_cells, 6) Voigt strain in the local (material) frame."""
+    sigma_mat: np.ndarray | None = None
+    """(6, n_cells, 6) Voigt stress in the local (material) frame."""
 
 
 def recover_strains(result: SectionResult) -> StrainField:
@@ -125,12 +135,24 @@ def recover_strains(result: SectionResult) -> StrainField:
     cell_areas = _cell_areas(mesh)
 
     eps = np.zeros((6, n_cells, 6))
+    epsM = np.zeros((6, n_cells, 6))
     sig = np.zeros((6, n_cells, 6))
+    sigM = np.zeros((6, n_cells, 6))
 
     x = ufl.SpatialCoordinate(mesh)
     DG0 = fem.functionspace(mesh, ("DG", 0))
     v = ufl.TestFunction(DG0)
     C_arr = Q_func.x.array.reshape(n_cells, 6, 6)
+    C_arrM = (
+        result.Cmat_func.x.array.reshape(n_cells, 6, 6)
+        if result.Cmat_func is not None
+        else None
+    )
+    C_arrLocal = (
+        result.Clocal_func.x.array.reshape(n_cells, 6, 6)
+        if result.Clocal_func is not None
+        else None
+    )
 
     primary = result.u_solutions
     for i in ALL_MODES:
@@ -155,8 +177,23 @@ def recover_strains(result: SectionResult) -> StrainField:
 
         for k in range(n_cells):
             sig[i, k, :] = C_arr[k] @ eps[i, k, :]
+            if C_arrM is not None:
+                sigM[i, k, :] = C_arrM[k] @ eps[i, k, :]
+                # eps_mat is the strain paired with sigma_mat: sigma_mat =
+                # C_local @ eps_mat, so eps_mat = C_local^{-1} @ sigma_mat.
+                # Using the global eps here (as sigma_mat does) would mix
+                # reference frames for any rotated anisotropic ply.
+                if C_arrLocal is not None:
+                    epsM[i, k, :] = np.linalg.solve(C_arrLocal[k], sigM[i, k, :])
 
-    return StrainField(epsilon=eps, sigma=sig, cell_areas=cell_areas)
+    have_mat = C_arrM is not None and C_arrLocal is not None
+    return StrainField(
+        epsilon=eps,
+        sigma=sig,
+        cell_areas=cell_areas,
+        epsilon_mat=epsM if have_mat else None,
+        sigma_mat=sigM if have_mat else None,
+    )
 
 
 def assemble_resultants_from_sigma(
@@ -259,5 +296,21 @@ def recover_unit_load_strains(result: SectionResult) -> UnitLoadStrainField:
     Gamma = np.linalg.solve(result.R, np.eye(6))  # column k = inv(R) @ e_k
     eps_out = np.einsum("ki,icv->kcv", Gamma.T, eps_b)
     sig_out = np.einsum("ki,icv->kcv", Gamma.T, sig_b)
+    epsM_out = (
+        np.einsum("ki,icv->kcv", Gamma.T, basis.epsilon_mat)
+        if basis.epsilon_mat is not None
+        else None
+    )
+    sigM_out = (
+        np.einsum("ki,icv->kcv", Gamma.T, basis.sigma_mat)
+        if basis.sigma_mat is not None
+        else None
+    )
 
-    return UnitLoadStrainField(epsilon=eps_out, sigma=sig_out, cell_areas=areas)
+    return UnitLoadStrainField(
+        epsilon=eps_out,
+        sigma=sig_out,
+        cell_areas=areas,
+        epsilon_mat=epsM_out,
+        sigma_mat=sigM_out,
+    )

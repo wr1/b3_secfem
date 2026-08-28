@@ -60,7 +60,7 @@ from .inertia import assemble_mass
 from .mesh import read_xdmf
 from .post import compute_centres
 from .result import SectionResult
-from .rotation3d import rotate_stiffness_6x6
+from .rotation3d import bond_T, rotate_stiffness_6x6
 from .spaces import (
     fill_per_cell_density,
     fill_per_cell_stiffness,
@@ -100,8 +100,11 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
     mesh, cell_tags = _load_mesh(inp)
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
 
-    C_per_cell, rho_per_cell = _per_cell_arrays(inp, n_cells, cell_tags)
+    C_per_cell, Cmat_per_cell, Clocal_per_cell, rho_per_cell = _per_cell_arrays(
+        inp, n_cells, cell_tags
+    )
 
+    oci = np.arange(n_cells, dtype=np.intp)
     if inp.per_cell_material is not None:
         # Remap per-cell arrays from INPUT (spec) cell ordering to dolfinx
         # internal cell ordering. dolfinx.mesh.create_mesh renumbers cells
@@ -112,10 +115,15 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
         # cell sec_14 mesh, dolfinx renumbers cell 0 -> input-tri 247.
         # Without this remap, secfem's M[0,0] over-counts by 10.5% and K
         # diagonal disagrees with ANBA on multi-material sections.
-        oci = np.asarray(mesh.topology.original_cell_index)
-        if oci.shape == (n_cells,) and not np.array_equal(oci, np.arange(n_cells)):
+        mesh_oci = np.asarray(mesh.topology.original_cell_index)
+        if mesh_oci.shape == (n_cells,) and not np.array_equal(
+            mesh_oci, np.arange(n_cells)
+        ):
+            oci = mesh_oci
             rho_per_cell = rho_per_cell[oci]
             C_per_cell = C_per_cell[oci]
+            Cmat_per_cell = Cmat_per_cell[oci]
+            Clocal_per_cell = Clocal_per_cell[oci]
 
     V = make_displacement_space(mesh, degree=inp.degree)
     Q = make_stiffness_space(mesh)
@@ -123,6 +131,12 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
 
     C_func = fem.Function(Q, name="C_bar")
     fill_per_cell_stiffness(C_func, C_per_cell)
+
+    Cmat_func = fem.Function(Q, name="Cmat_bar")
+    fill_per_cell_stiffness(Cmat_func, Cmat_per_cell)
+
+    Clocal_func = fem.Function(Q, name="Clocal_bar")
+    fill_per_cell_stiffness(Clocal_func, Clocal_per_cell)
 
     rho_func = fem.Function(R_space, name="rho")
     fill_per_cell_density(rho_func, rho_per_cell)
@@ -239,7 +253,10 @@ def _fenicsx_solve(inp: SectionInput) -> SectionResult:
         u_solutions=u_solutions,
         inplane_shear_warping=w_xy,
         C_func=C_func,
+        Cmat_func=Cmat_func,
+        Clocal_func=Clocal_func,
         mesh=mesh,
+        oci=oci,
     )
 
 
@@ -364,10 +381,25 @@ def _load_mesh(inp: SectionInput):
     raise ValueError(msg)
 
 
+def _stiffness_triplet(
+    mat: Any, beta_deg: float, alpha_deg: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(C_global, C_mat, C_local) for one ply orientation.
+
+    ``C_global = T C_local T.T`` maps global strain to global stress.
+    ``C_mat = C_local @ T.T`` maps global strain to material-frame stress.
+    """
+    C_local = mat.C_local()
+    T = bond_T(beta_deg, alpha_deg)
+    return rotate_stiffness_6x6(C_local, beta_deg, alpha_deg), C_local @ T.T, C_local
+
+
 def _per_cell_arrays(
     inp: SectionInput, n_cells: int, cell_tags: Any | None
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     C = np.zeros((n_cells, 6, 6))
+    Cmat = np.zeros((n_cells, 6, 6))
+    Clocal = np.zeros((n_cells, 6, 6))
     rho = np.zeros(n_cells)
 
     if inp.per_cell_material is not None:
@@ -382,9 +414,9 @@ def _per_cell_arrays(
             else np.zeros(n_cells)
         )
         for k, mat in enumerate(inp.per_cell_material):
-            C[k] = rotate_stiffness_6x6(mat.C_local(), beta[k], alpha[k])
+            C[k], Cmat[k], Clocal[k] = _stiffness_triplet(mat, beta[k], alpha[k])
             rho[k] = mat.rho
-        return C, rho
+        return C, Cmat, Clocal, rho
 
     if inp.region_materials is None:
         msg = "no per-cell or region material specification"
@@ -406,9 +438,11 @@ def _per_cell_arrays(
         if rm is None:
             msg = f"cell {k} has tag {tags_per_cell[k]} with no region material"
             raise KeyError(msg)
-        C[k] = rotate_stiffness_6x6(rm.material.C_local(), rm.beta_deg, rm.alpha_deg)
+        C[k], Cmat[k], Clocal[k] = _stiffness_triplet(
+            rm.material, rm.beta_deg, rm.alpha_deg
+        )
         rho[k] = rm.material.rho
-    return C, rho
+    return C, Cmat, Clocal, rho
 
 
 def _build_nullspace(V: Any):
