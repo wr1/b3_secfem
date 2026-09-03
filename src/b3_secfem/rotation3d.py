@@ -69,6 +69,16 @@ def material_axes(beta_deg: float, alpha_deg: float = 0.0) -> dict[str, np.ndarr
     }
 
 
+def bond_T(beta_deg: float, alpha_deg: float = 0.0) -> np.ndarray:
+    """Voigt 6x6 bond matrix from ply angles.
+
+    ``sigma_global = T @ sigma_local`` and
+    ``C_global = T @ C_local @ T.T``. Material-frame stress from global
+    strain is ``sigma_mat = C_local @ T.T @ eps_global``.
+    """
+    return _bond_T(_rotation_matrix_3x3(beta_deg, alpha_deg))
+
+
 def _bond_T(R: np.ndarray) -> np.ndarray:
     """Bond / Voigt 6x6 rotation matrix for stiffness.
 

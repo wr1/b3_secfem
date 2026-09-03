@@ -1,4 +1,4 @@
-"""Mesh-builder helpers shared by the geometry-ladder tests.
+"""Mesh-builder helpers for tests, examples, and downstream (SONATA) callers.
 
 All helpers return a ``(mesh_path, geom_info)`` pair. The mesh is written
 to ``tmp_path / "<name>.xdmf"`` so it can be loaded directly via the
@@ -26,7 +26,7 @@ from mpi4py import MPI
 
 
 def _write_quad_mesh(
-    path: Path,
+    path: Path | None,
     coords: np.ndarray,
     quads: np.ndarray,
     cell_tags: np.ndarray | None = None,
@@ -66,20 +66,21 @@ def _write_quad_mesh(
     domain = ufl.Mesh(e)
     mesh = dmesh.create_mesh(MPI.COMM_WORLD, quads_dolfinx, domain, coords)
 
-    if cell_tags is not None:
-        cell_dim = mesh.topology.dim
-        n_cells = cell_tags.size
-        indices = np.arange(n_cells, dtype=np.int32)
-        values = cell_tags.astype(np.int32)
-        mesh.topology.create_connectivity(cell_dim, cell_dim)
-        mt = meshtags(mesh, cell_dim, indices, values)
-        mt.name = "cell_tags"
-        with io.XDMFFile(mesh.comm, str(path), "w") as xf:
-            xf.write_mesh(mesh)
-            xf.write_meshtags(mt, mesh.geometry)
-    else:
-        with io.XDMFFile(mesh.comm, str(path), "w") as xf:
-            xf.write_mesh(mesh)
+    if path is not None:
+        if cell_tags is not None:
+            cell_dim = mesh.topology.dim
+            n_cells = cell_tags.size
+            indices = np.arange(n_cells, dtype=np.int32)
+            values = cell_tags.astype(np.int32)
+            mesh.topology.create_connectivity(cell_dim, cell_dim)
+            mt = meshtags(mesh, cell_dim, indices, values)
+            mt.name = "cell_tags"
+            with io.XDMFFile(mesh.comm, str(path), "w") as xf:
+                xf.write_mesh(mesh)
+                xf.write_meshtags(mt, mesh.geometry)
+        else:
+            with io.XDMFFile(mesh.comm, str(path), "w") as xf:
+                xf.write_mesh(mesh)
     return mesh
 
 
@@ -115,9 +116,9 @@ def hollow_cylinder(
     R_o = R_mid + t / 2
     R_i = R_mid - t / 2
     A = np.pi * (R_o**2 - R_i**2)
-    I = np.pi * (R_o**4 - R_i**4) / 4.0
+    I_area = np.pi * (R_o**4 - R_i**4) / 4.0
     J = np.pi * (R_o**4 - R_i**4) / 2.0
-    return path, {"A": A, "I": I, "J": J, "R_mid": R_mid, "t": t}
+    return path, {"A": A, "I": I_area, "J": J, "R_mid": R_mid, "t": t}
 
 
 def solid_ellipse(
