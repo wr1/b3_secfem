@@ -185,9 +185,9 @@ def recover_strains(result: SectionResult) -> StrainField:
             # reference frames for any rotated anisotropic ply.
             if C_arrLocal is not None:
                 # (n,6,6) @ (n,6,1) so the gufunc core is (m,m),(m,1) not (N,6).
-                epsM[i, :, :] = np.linalg.solve(
-                    C_arrLocal, sigM[i, :, :, np.newaxis]
-                )[..., 0]
+                epsM[i, :, :] = np.linalg.solve(C_arrLocal, sigM[i, :, :, np.newaxis])[
+                    ..., 0
+                ]
 
     have_mat = C_arrM is not None and C_arrLocal is not None
     return StrainField(

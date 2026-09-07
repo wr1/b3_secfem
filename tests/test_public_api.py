@@ -147,4 +147,3 @@ def test_strain_fields_reject_non_ndarray():
         StrainField(epsilon=[0], sigma=[0], cell_areas=[0])
     with pytest.raises(ValidationError):
         UnitLoadStrainField(epsilon=[0], sigma=[0], cell_areas=[0])
-

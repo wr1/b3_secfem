@@ -27,13 +27,13 @@ PURE_TESTS := tests/test_materials.py tests/test_rotation3d.py tests/test_adapte
 help:
 	@echo "b3_secfem developer targets:"
 	@echo ""
-	@echo "  make install      - editable-install b3_mat, airfoilmesh, b3_secfem[dev] into the '$(MAMBA_ENV)' env (run once)"
+	@echo "  make install      - editable-install b3_mat, airfoilmesh, b3_secfem[dev] into the '$(MAMBA_ENV)' env (run once); point git at .githooks"
 	@echo "  make test         - run the full test suite (requires prior 'make install')"
 	@echo "  make test-pure    - pure-Python tests only (no dolfinx; matches CI)"
 	@echo "  make smoke        - alias of test-pure (CI / pre-commit gate without fenicsx)"
 	@echo "  make lint         - ruff check"
 	@echo "  make format       - ruff format"
-	@echo "  make pre-commit   - pre-commit run --all-files (ruff + basic hooks)"
+	@echo "  make pre-commit   - pre-commit run --all-files (CI lint job)"
 	@echo "  make check        - lint + full test suite + unit-load recovery smoke test"
 	@echo "  make clean        - remove caches and the legacy uv venv"
 	@echo "  make install-venv - legacy: build a uv venv with --system-site-packages (fragile, see header)"
@@ -50,7 +50,7 @@ docs:
 install:
 	@echo "==> Installing local b3_mat + airfoilmesh (siblings) + b3_secfem[dev] into '$(MAMBA_ENV)'"
 	$(MAMBA_RUN) pip install -e ../b3_mat -e ../b3_af -e ".[dev]"
-	$(MAMBA_RUN) pre-commit install || true
+	git config core.hooksPath .githooks
 
 test:
 	$(MAMBA_RUN) python -m pytest -q --tb=short

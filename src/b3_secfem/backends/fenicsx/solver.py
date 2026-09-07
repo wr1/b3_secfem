@@ -108,7 +108,11 @@ def solve(inp: SectionInput) -> SectionResult:
     if linear_solver == "gamg":
         import os
 
-        if os.environ.get("B3_SECFEM_FORCE_GAMG", "").strip() not in ("1", "true", "yes"):
+        if os.environ.get("B3_SECFEM_FORCE_GAMG", "").strip() not in (
+            "1",
+            "true",
+            "yes",
+        ):
             ndof = int(V.dofmap.index_map.size_local) * int(V.dofmap.index_map_bs)
             if ndof < 20_000:
                 log.info(
@@ -347,10 +351,7 @@ def _assemble_energy_matrix(C_func: Any, eps_totals: dict[int, Any]) -> np.ndarr
     S = np.zeros((6, 6))
     for i in range(6):
         integrands = ufl.as_vector(
-            [
-                ufl.dot(eps_totals[i], ufl.dot(C_func, eps_totals[j]))
-                for j in range(6)
-            ]
+            [ufl.dot(eps_totals[i], ufl.dot(C_func, eps_totals[j])) for j in range(6)]
         )
         form = fem.form(ufl.inner(v, integrands) * ufl.dx)
         b = assemble_vector(form)

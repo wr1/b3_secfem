@@ -108,10 +108,10 @@ Many medium jobs (e.g. surrogate sweeps) care about **warm** wall time and
 ## Develop / CI
 
 ```bash
-pre-commit install          # ruff lint + format on commit
-make lint && make format    # same tools via Makefile
-make test-pure              # no dolfinx (matches CI unit job)
-make test                   # full suite (needs fenicsx env — see Makefile)
+git config core.hooksPath .githooks   # ruff check + format --check on commit
+make lint && make format              # same tools via Makefile
+make test-pure                        # no dolfinx (matches CI unit job)
+make test                             # full suite (needs fenicsx env — see Makefile)
 ```
 
 Release: tag `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) → GitHub

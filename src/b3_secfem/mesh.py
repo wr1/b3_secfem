@@ -149,10 +149,14 @@ def write_quad_xdmf(
 
     p = coords[quads]
     shoelace = (
-        p[:, 0, 0] * p[:, 1, 1] - p[:, 1, 0] * p[:, 0, 1]
-        + p[:, 1, 0] * p[:, 2, 1] - p[:, 2, 0] * p[:, 1, 1]
-        + p[:, 2, 0] * p[:, 3, 1] - p[:, 3, 0] * p[:, 2, 1]
-        + p[:, 3, 0] * p[:, 0, 1] - p[:, 0, 0] * p[:, 3, 1]
+        p[:, 0, 0] * p[:, 1, 1]
+        - p[:, 1, 0] * p[:, 0, 1]
+        + p[:, 1, 0] * p[:, 2, 1]
+        - p[:, 2, 0] * p[:, 1, 1]
+        + p[:, 2, 0] * p[:, 3, 1]
+        - p[:, 3, 0] * p[:, 2, 1]
+        + p[:, 3, 0] * p[:, 0, 1]
+        - p[:, 0, 0] * p[:, 3, 1]
     )
     flip = shoelace < 0
     if flip.any():
@@ -192,7 +196,9 @@ def solver_cell_tags(result: Any, mesh_path: str | Path) -> np.ndarray:
         m = meshio.read(str(mesh_path))
         for name, blocks in (m.cell_data or {}).items():
             if "tag" in name.lower():
-                return np.concatenate([np.asarray(b).ravel() for b in blocks]).astype(int)
+                return np.concatenate([np.asarray(b).ravel() for b in blocks]).astype(
+                    int
+                )
         msg = f"no cell tags found in {mesh_path}"
         raise ValueError(msg)
 
@@ -219,7 +225,9 @@ def cell_centroids(mesh: Any) -> np.ndarray:
 
         dim = mesh.topology.dim
         n = mesh.topology.index_map(dim).size_local
-        return _np.asarray(compute_midpoints(mesh, dim, _np.arange(n, dtype=_np.int32)))[:, :2]
+        return _np.asarray(
+            compute_midpoints(mesh, dim, _np.arange(n, dtype=_np.int32))
+        )[:, :2]
 
     if "mfem" in kind:
         import numpy as _np

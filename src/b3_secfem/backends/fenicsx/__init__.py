@@ -54,7 +54,11 @@ def assemble_stiffness_matrix(
     from dolfinx.fem.petsc import assemble_matrix
 
     from .forms import stiffness_bilinear
-    from .spaces import fill_per_cell_stiffness, make_displacement_space, make_stiffness_space
+    from .spaces import (
+        fill_per_cell_stiffness,
+        make_displacement_space,
+        make_stiffness_space,
+    )
 
     mesh.topology.create_connectivity(mesh.topology.dim, mesh.topology.dim)
 

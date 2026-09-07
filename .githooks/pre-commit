@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Local gate matching CI lint (ruff check + format). Install once:
+#   git config core.hooksPath .githooks
+# (make install does this.) Git has no pre-commit hook on merge, so
+# .githooks/pre-merge-commit is the same script.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+export PATH="${HOME}/.local/bin:${HOME}/micromamba/bin:${HOME}/.micromamba/bin:${PATH}"
+
+run_ruff() {
+  if command -v micromamba >/dev/null 2>&1; then
+    micromamba run -n b3secfem ruff "$@"
+  elif command -v ruff >/dev/null 2>&1; then
+    ruff "$@"
+  else
+    echo "pre-commit: ruff not found; run 'make install' or put ruff on PATH" >&2
+    exit 1
+  fi
+}
+
+run_ruff check src tests
+run_ruff format --check src tests

@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         description="b3_secfem cross-section solver",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "JSON may set \"backend\" (fenicsx|mfem). "
+            'JSON may set "backend" (fenicsx|mfem). '
             "CLI --backend overrides the JSON value.\n"
             "\n"
             "Minimal JSON spec:\n"
@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         "--backend",
         choices=("fenicsx", "mfem"),
         default=None,
-        help="FEM backend (overrides JSON \"backend\" if set)",
+        help='FEM backend (overrides JSON "backend" if set)',
     )
     parser.add_argument(
         "--json",

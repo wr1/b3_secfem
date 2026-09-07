@@ -1,5 +1,6 @@
-# Pre-commit: ruff lint + format. Install once:
-#   pip install pre-commit && pre-commit install
+# CI lint job (pre-commit/action). Local commits use .githooks (ruff check
+# + format --check on src/ + tests/). Do not `pre-commit install` while
+# core.hooksPath is .githooks — that would overwrite the versioned hook.
 # Run all files:
 #   pre-commit run --all-files
 # Or: make pre-commit

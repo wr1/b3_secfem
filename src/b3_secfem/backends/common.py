@@ -87,9 +87,7 @@ def per_cell_arrays(
         mask = tags_per_cell == int(tag)
         if not mask.any():
             continue
-        C_rot, C_mat, C_loc = _stiffness_triplet(
-            rm.material, rm.beta_deg, rm.alpha_deg
-        )
+        C_rot, C_mat, C_loc = _stiffness_triplet(rm.material, rm.beta_deg, rm.alpha_deg)
         C[mask] = C_rot
         Cmat[mask] = C_mat
         Clocal[mask] = C_loc
