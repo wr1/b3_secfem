@@ -26,11 +26,11 @@ class SectionResult(BaseModel):
     shear-centre GJ.
 
     The ``backend`` tag records which FEM engine produced the result ("fenicsx"
-    or "mfem"). The four optional payload fields (u_solutions, inplane_shear_warping,
-    C_func, mesh) contain backend-specific objects (dolfinx Functions/Mesh or
-    mfem GridFunctions/Mesh) retained **only** for downstream strain/stress
-    recovery and visualisation. They are not validated by Pydantic and are
-    unnecessary if you only consume K/M/centres.
+    or "mfem"). The optional payload fields (u_solutions, inplane_shear_warping,
+    C_func, Cmat_func, Clocal_func, mesh, oci) contain backend-specific objects
+    (dolfinx Functions/Mesh or mfem GridFunctions/Mesh) retained **only** for
+    downstream strain/stress recovery and visualisation. They are not validated
+    by Pydantic and are unnecessary if you only consume K/M/centres.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -66,7 +66,13 @@ class SectionResult(BaseModel):
     """Backend-specific warping field (dolfinx Function or mfem GridFunction)
     for the 7th in-plane-shear cell problem. Used by viz.plot_warping."""
     C_func: Any | None = None
+    Cmat_func: Any | None = None
+    """Per-cell ``C_local @ T.T`` so ``sigma_mat = Cmat @ eps_global``."""
+    Clocal_func: Any | None = None
+    """Per-cell unrotated ply stiffness. ``eps_mat = C_local^{-1} @ sigma_mat``."""
     mesh: Any | None = None
+    oci: np.ndarray | None = None
+    """Map from dolfinx cell index to input-spec cell index, or identity."""
 
     @property
     def K_gxbeam_order(self) -> np.ndarray:

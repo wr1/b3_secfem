@@ -25,8 +25,8 @@ def test_per_cell_material_path():
         per_cell_beta_deg=np.array([0.0, 15.0]),
         per_cell_alpha_deg=np.zeros(n),
     )
-    C, rho = per_cell_arrays(inp, n, None)
-    assert C.shape == (2, 6, 6)
+    C, Cmat, Clocal, rho = per_cell_arrays(inp, n, None)
+    assert C.shape == Cmat.shape == Clocal.shape == (2, 6, 6)
     assert rho.tolist() == [2700.0, 7800.0]
     assert C[0, 0, 0] != C[1, 0, 0]
 
@@ -42,7 +42,7 @@ def test_region_materials_with_tags():
         },
     )
     tags = SimpleNamespace(indices=np.array([0, 1, 2]), values=np.array([1, 2, 1]))
-    C, rho = per_cell_arrays(inp, 3, tags)
+    C, _Cmat, _Clocal, rho = per_cell_arrays(inp, 3, tags)
     assert rho.tolist() == [2700.0, 7800.0, 2700.0]
     np.testing.assert_allclose(C[0], C[2])
     assert not np.allclose(C[0], C[1])
@@ -53,7 +53,7 @@ def test_region_single_material_no_tags():
         mesh_path="x.xdmf",
         region_materials={7: RegionMat(material=_iso())},
     )
-    C, rho = per_cell_arrays(inp, 4, None)
+    C, _Cmat, _Clocal, rho = per_cell_arrays(inp, 4, None)
     assert C.shape == (4, 6, 6)
     assert np.all(rho == 2700.0)
     np.testing.assert_allclose(C[0], C[3])
@@ -102,5 +102,5 @@ def test_orthotropic_region_rotates():
         },
     )
     tags = SimpleNamespace(indices=np.array([0, 1]), values=np.array([1, 2]))
-    C, _rho = per_cell_arrays(inp, 2, tags)
+    C, _Cmat, _Clocal, _rho = per_cell_arrays(inp, 2, tags)
     assert not np.allclose(C[0], C[1])

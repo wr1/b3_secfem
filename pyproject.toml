@@ -76,6 +76,6 @@ quote-style = "double"
 # imports must legitimately come after a module-level statement.
 "tests/*" = ["E402"]
 # 'I' is the conventional symbol for the second moment of area; keep it.
-"tests/_meshlib.py" = ["E402", "E741"]
+"src/b3_secfem/_meshlib.py" = ["E402", "E741"]
 # 'I'/'J'/'D' are the conventional CSR row-pointer / column / data arrays.
 "src/b3_secfem/backends/mfem.py" = ["E741"]

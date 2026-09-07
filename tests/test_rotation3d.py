@@ -17,6 +17,7 @@ from b3_secfem.rotation3d import (
     _Ry,
     _Rz,
     _rotation_matrix_3x3,
+    bond_T,
     fibre_direction,
     material_axes,
     rotate_stiffness_6x6,
@@ -88,6 +89,30 @@ def test_round_trip_identity():
             T_inv = np.linalg.inv(T)
             C2 = T_inv @ C1 @ T_inv.T
             np.testing.assert_allclose(C2, C, atol=1e-3, rtol=1e-10)
+
+
+def test_bond_T_from_angles_matches_C_local_T_T_material_stress():
+    """sigma_mat = C_local @ T.T @ eps_global, and C_global = T @ C_local @ T.T."""
+    mat = OrthotropicMaterial(
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
+    )
+    C_local = mat.C_local()
+    T = bond_T(20.0, 15.0)
+    eps = np.array([1.0, -0.2, 0.1, 0.05, -0.03, 0.02])
+    np.testing.assert_allclose(C_local @ T.T @ eps, (C_local @ T.T) @ eps)
+    np.testing.assert_allclose(
+        rotate_stiffness_6x6(C_local, 20.0, 15.0), T @ C_local @ T.T
+    )
+    np.testing.assert_allclose(T, _bond_T(_rotation_matrix_3x3(20.0, 15.0)))
 
 
 def test_rotated_stiffness_is_symmetric():

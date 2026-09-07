@@ -12,6 +12,7 @@ from dolfinx import mesh as dmesh
 
 from b3_secfem import (
     IsotropicMaterial,
+    OrthotropicMaterial,
     RegionMat,
     SectionInput,
     assemble_resultants_from_sigma,
@@ -175,3 +176,110 @@ def test_plot_unit_load_fields_writes_png(tmp_path):
     dest = tmp_path / "fields.png"
     plot_unit_load_fields(res, ul, dest, title="unit-load σ")
     assert dest.is_file() and dest.stat().st_size > 0
+
+
+def _rotated_ortho_rectangle(
+    tmp_path, beta_deg=20.0, alpha_deg=15.0, a=0.1, b=0.1, n=10
+):
+    """Homogeneous rectangle of an off-axis (rotated) orthotropic ply.
+
+    A nonzero, non-multiple-of-90 (beta, alpha) is essential here: it is
+    exactly the case for which the material frame and the section (global)
+    frame disagree on every Voigt component, so pairing the wrong stress/
+    strain pair is guaranteed to be visible.
+    """
+    mat = OrthotropicMaterial(
+        E1=140e9,
+        E2=10e9,
+        E3=10e9,
+        G12=5e9,
+        G13=5e9,
+        G23=3.5e9,
+        nu12=0.3,
+        nu13=0.3,
+        nu23=0.4,
+        rho=1600.0,
+    )
+    path = tmp_path / "rect_ortho.xdmf"
+    m = dmesh.create_rectangle(
+        MPI.COMM_WORLD,
+        [(-a / 2, -b / 2), (a / 2, b / 2)],
+        [n, n],
+        cell_type=dmesh.CellType.quadrilateral,
+    )
+    write_xdmf(path, m)
+    inp = SectionInput(
+        mesh_path=path,
+        region_materials={
+            1: RegionMat(material=mat, beta_deg=beta_deg, alpha_deg=alpha_deg)
+        },
+        linear_solver="lu",
+    )
+    return mat, path, inp
+
+
+def test_material_frame_energy_matches_global_frame(tmp_path):
+    """Strain energy density is frame-invariant: 0.5*sigma.eps must be the
+    same whether evaluated in the global or the material (ply) frame.
+
+    Regression guard for a bug where ``sigma_mat`` (correctly rotated into
+    the material frame) was paired downstream with the *global* ``epsilon``
+    instead of a material-frame strain, silently breaking this invariant
+    for any off-axis anisotropic ply while leaving K/M/frequencies
+    unaffected (the corruption only shows up in recovered stress/strain
+    energy, e.g. modal-strain-energy damping estimates).
+    """
+    _mat, _path, inp = _rotated_ortho_rectangle(tmp_path)
+    res = solve(inp)
+    ul = recover_unit_load_strains(res)
+
+    for k in range(6):
+        energy_global = np.einsum("cv,cv->c", ul.sigma[k], ul.epsilon[k])
+        energy_mat = np.einsum("cv,cv->c", ul.sigma_mat[k], ul.epsilon_mat[k])
+        np.testing.assert_allclose(
+            energy_mat,
+            energy_global,
+            rtol=1e-6,
+            atol=1e-6 * max(np.abs(energy_global).max(), 1e-30),
+            err_msg=f"energy not frame-invariant for unit load case {k}",
+        )
+
+
+def test_epsilon_mat_differs_from_global_epsilon_when_rotated(tmp_path):
+    """Guard against silently re-aliasing epsilon_mat to the global strain.
+
+    For a genuinely off-axis ply the material-frame and global strains must
+    differ meaningfully under torque (Mz, the load case most affected by
+    the real bug). A test that never exercises this would pass whether or
+    not epsilon_mat was actually computed.
+    """
+    _mat, _path, inp = _rotated_ortho_rectangle(tmp_path)
+    res = solve(inp)
+    ul = recover_unit_load_strains(res)
+
+    mz = 5  # unit-load order is [Fx, Fy, Fz, Mx, My, Mz]
+    diff = np.abs(ul.epsilon_mat[mz] - ul.epsilon[mz])
+    scale = np.abs(ul.epsilon[mz]).max()
+    assert diff.max() > 1e-3 * max(scale, 1e-30)
+
+
+def test_sigma_mat_consistent_with_local_constitutive_law(tmp_path):
+    """sigma_mat must equal C_local @ epsilon_mat cell-by-cell: that is the
+    definition of "material frame", and is what makes energy frame-
+    invariant. Catches a regression to pairing sigma_mat with the global
+    strain (which instead satisfies sigma_mat == C_local @ T.T @ epsilon,
+    not C_local @ epsilon_mat).
+    """
+    mat, _path, inp = _rotated_ortho_rectangle(tmp_path, beta_deg=33.0, alpha_deg=-12.0)
+    res = solve(inp)
+    ul = recover_unit_load_strains(res)
+    C_local = mat.C_local()
+
+    for k in range(6):
+        predicted = np.einsum("ij,cj->ci", C_local, ul.epsilon_mat[k])
+        np.testing.assert_allclose(
+            predicted,
+            ul.sigma_mat[k],
+            rtol=1e-6,
+            atol=1e-6 * max(np.abs(ul.sigma_mat[k]).max(), 1e-30),
+        )

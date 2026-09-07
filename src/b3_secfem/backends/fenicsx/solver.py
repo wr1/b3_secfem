@@ -49,8 +49,11 @@ def solve(inp: SectionInput) -> SectionResult:
     mesh, cell_tags = _load_mesh(inp)
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
 
-    C_per_cell, rho_per_cell = per_cell_arrays(inp, n_cells, cell_tags)
+    C_per_cell, Cmat_per_cell, Clocal_per_cell, rho_per_cell = per_cell_arrays(
+        inp, n_cells, cell_tags
+    )
 
+    oci = np.arange(n_cells, dtype=np.intp)
     if inp.per_cell_material is not None:
         # Remap per-cell arrays from INPUT (spec) cell ordering to dolfinx
         # internal cell ordering. dolfinx.mesh.create_mesh renumbers cells
@@ -61,10 +64,15 @@ def solve(inp: SectionInput) -> SectionResult:
         # cell sec_14 mesh, dolfinx renumbers cell 0 -> input-tri 247.
         # Without this remap, secfem's M[0,0] over-counts by 10.5% and K
         # diagonal disagrees with ANBA on multi-material sections.
-        oci = np.asarray(mesh.topology.original_cell_index)
-        if oci.shape == (n_cells,) and not np.array_equal(oci, np.arange(n_cells)):
+        mesh_oci = np.asarray(mesh.topology.original_cell_index)
+        if mesh_oci.shape == (n_cells,) and not np.array_equal(
+            mesh_oci, np.arange(n_cells)
+        ):
+            oci = mesh_oci
             rho_per_cell = rho_per_cell[oci]
             C_per_cell = C_per_cell[oci]
+            Cmat_per_cell = Cmat_per_cell[oci]
+            Clocal_per_cell = Clocal_per_cell[oci]
 
     V = make_displacement_space(mesh, degree=inp.degree)
     Q = make_stiffness_space(mesh)
@@ -72,6 +80,12 @@ def solve(inp: SectionInput) -> SectionResult:
 
     C_func = fem.Function(Q, name="C_bar")
     fill_per_cell_stiffness(C_func, C_per_cell)
+
+    Cmat_func = fem.Function(Q, name="Cmat_bar")
+    fill_per_cell_stiffness(Cmat_func, Cmat_per_cell)
+
+    Clocal_func = fem.Function(Q, name="Clocal_bar")
+    fill_per_cell_stiffness(Clocal_func, Clocal_per_cell)
 
     rho_func = fem.Function(R_space, name="rho")
     fill_per_cell_density(rho_func, rho_per_cell)
@@ -204,7 +218,10 @@ def solve(inp: SectionInput) -> SectionResult:
         u_solutions=u_solutions,
         inplane_shear_warping=w_xy,
         C_func=C_func,
+        Cmat_func=Cmat_func,
+        Clocal_func=Clocal_func,
         mesh=mesh,
+        oci=oci,
     )
 
 
