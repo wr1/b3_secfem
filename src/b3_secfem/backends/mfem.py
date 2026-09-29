@@ -11,36 +11,20 @@ stiffness), Cmat (xy-z coupling) and Mmat (pure-z); the two-stage chain then
 reduces to matrix-vector products, K = R S^{-1} Rᵀ follows from a quadrature
 pass, and M/centres/K_xy mirror the fenicsx closed forms. ``solve()`` returns a
 complete ``SectionResult``. Validated against the fenicsx backend via
-``b3_secfem.bench``: K/M/centres/K_xy agree to ~1e-11 relative on iso and
-orthotropic rectangles (see tests/test_backend_comparison.py).
+``b3_secfem.bench``: K/M/centres agree to ~1e-8 relative on iso and
+orthotropic rectangles (``tests/test_backend_comparison.py`` gates ``K_rel``
+at 1e-8). ``recover_strains`` is implemented.
 
-Not yet ported: strain/stress field recovery (``recover_strains``) and the
-input-cell-order remap needed for ``per_cell_material`` on dolfinx-renumbered
-meshes (region-tagged and uniform sections are fine).
-
-**Cannot yet read a laminate section mesh (2026-07-13).** MFEM's XDMF reader takes
-only a single grid::
-
-    Error: Couldn't read file .../section.xdmf as xdmf
-    XDMF reader: Only supports one grid right now.
-
-``b3_af.afmesh`` writes one grid per region tag (one per unique material+angle pair),
-so every real blade section is multi-grid and this backend rejects it outright. It
-therefore cannot currently stand in for fenicsx in ``b3_invsec`` — which was the reason
-to want it, since fenicsx's FFCx JIT makes each worker process heavy to start.
-
-To make it usable, in rough order of effort:
-  1. multi-grid XDMF read (or read the mesh once and apply cell tags separately);
-  2. ``recover_strains`` — ``b3_invsec.evaluate`` needs the 7 unit-load strain fields,
-     not just K/M.
-Until (1) and (2) land, ``solve(inp, backend="mfem")`` works only on single-region
-meshes.
+**Meshes.** ``solve`` reads through :func:`b3_secfem.mesh_io.read_section_mesh`,
+which accepts a meshio single-grid XDMF, a dolfinx two-grid XDMF (mesh plus
+cell tags), and a gxbeam VTU. Cell order in the MFEM mesh is the file order
+after the counter-clockwise correction. A file with more than one 2-D cell
+block is rejected.
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -77,108 +61,41 @@ def _require_mfem():
 
 
 def _load_mfem_mesh(inp: SectionInput) -> tuple[Any, np.ndarray | None, int]:
-    """Load mesh via meshio and build an mfem.Mesh preserving input cell order.
+    """Build an mfem.Mesh from :func:`read_section_mesh`.
 
-    Returns (mfem_mesh, tags_per_cell or None, n_cells).
-    Only quads are fully supported today (the dominant case in examples
-    and cross-check ladder). Tri support is straightforward to add.
+    Returns ``(mfem_mesh, tags_per_cell or None, n_cells)``. Cell order matches
+    the reader: file order, counter-clockwise. Quads and triangles are both
+    accepted; a mixed file is rejected by the reader.
     """
     _require_mfem()
-    import meshio
+    from ..mesh_io import read_section_mesh
 
-    path = Path(inp.mesh_path)
-    m = meshio.read(str(path))
-
-    # Find first 2D cell block
-    cells = None
-    ctype = None
-    for cb in m.cells:
-        if cb.type in ("quad", "quadrilateral"):
-            cells = cb.data.astype(np.int64)
-            ctype = "quad"
-            break
-        if cb.type in ("triangle", "tri"):
-            cells = cb.data.astype(np.int64)
-            ctype = "tri"
-            break
-    if cells is None:
-        raise ValueError(f"no quad or tri cells found in {path}")
-
-    nodes = m.points[:, :2].astype(np.float64)
+    loaded = read_section_mesh(inp.mesh_path)
+    nodes = np.asarray(loaded.points, dtype=np.float64)
+    cells = np.asarray(loaded.cells, dtype=np.int64)
     n_cells = cells.shape[0]
-
-    # CCW validation + fix (same shoelace as the rest of the package)
-    p = nodes[cells]
-    if ctype == "quad":
-        sa = (
-            p[:, 0, 0] * p[:, 1, 1]
-            - p[:, 1, 0] * p[:, 0, 1]
-            + p[:, 1, 0] * p[:, 2, 1]
-            - p[:, 2, 0] * p[:, 1, 1]
-            + p[:, 2, 0] * p[:, 3, 1]
-            - p[:, 3, 0] * p[:, 2, 1]
-            + p[:, 3, 0] * p[:, 0, 1]
-            - p[:, 0, 0] * p[:, 3, 1]
-        )
-        flip = sa < 0
-        if flip.any():
-            cells[flip] = cells[flip][:, [0, 3, 2, 1]]
-        # MFEM quad node ordering is usually CCW BL-BR-TR-TL or similar;
-        # we keep the CCW order from the file.
-    else:
-        # tri shoelace (simpler)
-        sa = (
-            p[:, 0, 0] * p[:, 1, 1]
-            - p[:, 1, 0] * p[:, 0, 1]
-            + p[:, 1, 0] * p[:, 2, 1]
-            - p[:, 2, 0] * p[:, 1, 1]
-            + p[:, 2, 0] * p[:, 0, 1]
-            - p[:, 0, 0] * p[:, 2, 1]
-        )
-        flip = sa < 0
-        if flip.any():
-            cells[flip] = cells[flip][:, [0, 2, 1]]
-
-    # Build mfem.Mesh from vertices + elements using the proper AddQuad/AddTriangle API
     nv = nodes.shape[0]
-    ne = n_cells
-    mesh = mfem.Mesh(2, nv, ne, 0, 2)  # dim, nvert, nelem, nbdr, spaceDim
+    mesh = mfem.Mesh(2, nv, n_cells, 0, 2)
 
     for i in range(nv):
         mesh.AddVertex(nodes[i])
 
-    if ctype == "quad":
-        for i in range(ne):
+    if loaded.cell_type == "quad":
+        for i in range(n_cells):
             mesh.AddQuad(
                 int(cells[i, 0]), int(cells[i, 1]), int(cells[i, 2]), int(cells[i, 3])
             )
     else:
-        for i in range(ne):
+        for i in range(n_cells):
             mesh.AddTriangle(int(cells[i, 0]), int(cells[i, 1]), int(cells[i, 2]))
 
     mesh.FinalizeTopology()
     mesh.Finalize()
-
-    # Per-cell tags (region or default 1)
-    tags = None
-    cell_data = m.cell_data_dict if hasattr(m, "cell_data_dict") else {}
-    # Try common names used by our VTU/XDMF writers
-    for key in ("cell_tags", "tags", "region", "mat"):
-        if key in cell_data:
-            arr = cell_data[key]
-            if isinstance(arr, dict):
-                # `a or b` truth-tests the array and raises for len > 1, so the
-                # fallback has to be an explicit None check. meshio keys this
-                # dict by cell type ("quad"), but the writer may have used
-                # "quadrilateral" — take the sole block when the key misses.
-                picked = arr.get(ctype)
-                if picked is None:
-                    picked = next(iter(arr.values()), None)
-                arr = picked
-            if arr is not None:
-                tags = np.asarray(arr, dtype=np.int32)[:n_cells]
-                break
-
+    tags = (
+        None
+        if loaded.cell_tags is None
+        else np.asarray(loaded.cell_tags, dtype=np.int32)
+    )
     return mesh, tags, n_cells
 
 
@@ -351,7 +268,8 @@ def solve(inp: SectionInput) -> SectionResult:
     The singular systems are solved with a bordered KKT factorisation (the
     direct analogue of the fenicsx PETSc null-space projection). Then
     ``K = R S^{-1} Rᵀ`` from the resultant/energy matrices. Validated against
-    fenicsx via ``b3_secfem.bench`` (K/M/centres agree to ~1e-8 relative).
+    fenicsx via ``b3_secfem.bench`` (K/M/centres agree to ~1e-8 relative;
+    see the module docstring).
     """
     _require_mfem()
     from types import SimpleNamespace

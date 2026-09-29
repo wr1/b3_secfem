@@ -100,14 +100,15 @@ class SectionInput(BaseModel):
 def materials_from_b3_mat(mat: Any) -> Material:
     """Convert a b3_mat material to its b3_secfem twin.
 
-    Prefer ``isinstance`` against real ``b3_mat`` classes when the package is
-    importable; fall back to class-name matching so ``b3_mat`` stays optional.
+    ``b3_mat`` is the ``b3mat`` extra (``pip install 'b3_secfem[b3mat]'``),
+    not a core dependency. When it is installed, real classes are matched
+    with ``isinstance`` and unknown objects still fall back to class name.
     """
     try:
         from b3_mat import IsotropicMaterial as B3Iso
         from b3_mat import OrthotropicMaterial as B3Ortho
-    except ImportError:
-        B3Iso = B3Ortho = ()  # type: ignore[misc, assignment]
+    except ImportError as exc:
+        raise ImportError("install b3_secfem[b3mat]") from exc
 
     if B3Iso and isinstance(mat, B3Iso):
         return IsotropicMaterial(E=mat.E, nu=mat.nu, rho=mat.rho, name=mat.name)

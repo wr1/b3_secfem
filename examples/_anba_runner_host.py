@@ -8,6 +8,9 @@ untouched.
 
 Snap-installed Docker on this host blocks bind-mounting ``/tmp``; the
 wrapper requires a workdir under ``$HOME``.
+
+Set ``ANBA_PYTHON`` to the ANBA4 interpreter. If it is unset, the wrapper
+looks for ``~/.local/share/mamba/envs/anba4/bin/python``.
 """
 
 from __future__ import annotations

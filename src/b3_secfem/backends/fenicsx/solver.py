@@ -16,7 +16,6 @@ import numpy as np
 from ...config import SectionInput
 from ...kinematics import voigt_strain
 from ...inertia import assemble_mass
-from ...mesh import read_xdmf
 from ...post import compute_centres
 from ...result import SectionResult
 from ..common import ALL_MODES, STAGE1_MODES, STAGE2_MODES, per_cell_arrays
@@ -363,15 +362,13 @@ def _assemble_energy_matrix(C_func: Any, eps_totals: dict[int, Any]) -> np.ndarr
 def _load_mesh(inp: SectionInput):
     path = Path(inp.mesh_path)
     suffix = path.suffix.lower()
-    if suffix == ".xdmf":
-        return read_xdmf(path)
-    if suffix == ".vtu":
-        from ...mesh import from_gxbeam_vtu
+    if suffix not in {".xdmf", ".vtu"}:
+        msg = f"unsupported mesh extension {suffix}; use .xdmf or .vtu"
+        raise ValueError(msg)
+    from ...mesh_io import read_section_mesh
+    from .io import mesh_from_section
 
-        info = from_gxbeam_vtu(path)
-        return info["mesh"], None
-    msg = f"unsupported mesh extension {suffix}; use .xdmf or .vtu"
-    raise ValueError(msg)
+    return mesh_from_section(read_section_mesh(path))
 
 
 def _build_nullspace(V: Any):

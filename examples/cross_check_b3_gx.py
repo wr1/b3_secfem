@@ -304,7 +304,7 @@ def run_case(case: Case, out_dir: Path, with_anba: bool = False) -> dict:
     # in-plane rotation about z. Maps to b3_secfem's ``alpha_deg``. Verified
     # in examples/probe_theta_convention.py: K[Fz,Fz] matches gxbeam exactly
     # at θ ∈ {0°, 90°}; a residual ~5–12 % gap remains at mid-range angles
-    # from a rotation-axis convention difference noted in notes/claude.md.
+    # from a rotation-axis convention difference (see docs/validation/).
     inp = SectionInput(
         mesh_path=vtu,
         per_cell_material=[case.material] * info["n_cells"],

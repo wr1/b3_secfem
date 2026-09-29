@@ -13,7 +13,7 @@ eta_clip > 0, degenerate cells are the cause.
 
 Run::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_airfoil_degenerate.py
+    python examples/probe_airfoil_degenerate.py
 """
 
 from __future__ import annotations

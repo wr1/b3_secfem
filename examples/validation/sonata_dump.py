@@ -7,7 +7,7 @@ The live SONATA+secfem adapter is
 
     git clone -b b3_fix https://github.com/NLRWindSystems/SONATA.git
     # env with pythonocc + dolfinx + editable b3_secfem
-    python examples/validation/sonata_dump.py
+    SONATA_ROOT=/path/to/SONATA python examples/validation/sonata_dump.py
 
 Writes ``examples/validation/out/sonata/<case>.json`` with nodes, cells,
 MatID, theta_1, theta_3, material cards, and solver TS/MM when the solve
@@ -25,19 +25,25 @@ from pathlib import Path
 import numpy as np
 
 OUT = Path(__file__).resolve().parent / "out" / "sonata"
-# NLR b3_fix checkout if present; else local clone. Override with SONATA_ROOT.
-SONATA_ROOT = Path(os.environ.get("SONATA_ROOT", "/home/wr1/software/SONATA"))
 
-CASES = {
-    "beam0": (
-        SONATA_ROOT
-        / "tests/regression/0_beams"
-        / "0_box_beam_HT_antisym_layup_15_6_SI_SmithChopra91.yaml"
-    ),
-    "iea15": SONATA_ROOT / "tests/regression/1_iea15mw/iea_15_240_rwt.yaml",
-    "iea22": SONATA_ROOT / "tests/regression/2_iea22mw/iea_22_280_rwt.yaml",
-    "rotated": SONATA_ROOT / "tests/regression/6_box_beam/rotated_beam.yaml",
-}
+
+def _cases() -> dict[str, Path]:
+    """YAML paths under ``SONATA_ROOT``. The variable is required."""
+    raw = os.environ.get("SONATA_ROOT")
+    if not raw:
+        msg = "SONATA_ROOT is required (path to an NLR SONATA b3_fix checkout)"
+        raise SystemExit(msg)
+    root = Path(raw)
+    return {
+        "beam0": (
+            root
+            / "tests/regression/0_beams"
+            / "0_box_beam_HT_antisym_layup_15_6_SI_SmithChopra91.yaml"
+        ),
+        "iea15": root / "tests/regression/1_iea15mw/iea_15_240_rwt.yaml",
+        "iea22": root / "tests/regression/2_iea22mw/iea_22_280_rwt.yaml",
+        "rotated": root / "tests/regression/6_box_beam/rotated_beam.yaml",
+    }
 
 
 def _mat_card(m) -> dict:
@@ -143,12 +149,13 @@ def dump_case(
 
 
 def main() -> int:
+    cases = _cases()
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "cases",
         nargs="*",
         default=["beam0"],
-        help=f"subset of {list(CASES)} (default: beam0)",
+        help=f"subset of {list(cases)} (default: beam0)",
     )
     p.add_argument("--all", action="store_true")
     p.add_argument(
@@ -170,10 +177,10 @@ def main() -> int:
         print("Activate the SONATA+ANBA env and re-run.", file=sys.stderr)
         return 2
 
-    names = list(CASES) if args.all else args.cases
+    names = list(cases) if args.all else args.cases
     OUT.mkdir(parents=True, exist_ok=True)
     for name in names:
-        yaml_path = CASES[name]
+        yaml_path = cases[name]
         stations = args.stations
         if stations is None and name.startswith("iea"):
             stations = [0.5]

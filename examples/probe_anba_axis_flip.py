@@ -24,7 +24,7 @@ compare to b3_secfem and gxbeam.
 
 Run::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_anba_axis_flip.py
+    python examples/probe_anba_axis_flip.py
 """
 
 from __future__ import annotations

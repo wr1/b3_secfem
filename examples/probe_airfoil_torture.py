@@ -27,7 +27,7 @@ For each engine we report:
 
 Run::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_airfoil_torture.py
+    python examples/probe_airfoil_torture.py
 """
 
 from __future__ import annotations

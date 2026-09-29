@@ -9,9 +9,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import scipy.sparse as sp
 
 if TYPE_CHECKING:
+    import scipy.sparse as sp
+
     from ...config import SectionInput
     from ...result import SectionResult
 
@@ -49,6 +50,7 @@ def assemble_stiffness_matrix(
         The assembled global stiffness matrix (symmetric positive semi-definite,
         with 4-dimensional kernel of rigid modes).
     """
+    import scipy.sparse as sp
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_matrix

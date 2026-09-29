@@ -30,7 +30,6 @@ def main() -> None:
 
     # Warm fenicsx forms + numba kernels once
     print("warming fenicsx + numba …")
-    os.environ["B3_SECFEM_LINEAR_SOLVER"] = "lu"
     warm_up(linear_solver="lu", recover=False)
     if _HAS_NUMBA:
         with tempfile.TemporaryDirectory() as td:

@@ -1,0 +1,31 @@
+name: fenicsx
+
+# Advisory until this job is green for two weeks. It is not a required check.
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/b3_secfem/backends/fenicsx/**"
+      - "src/b3_secfem/recovery.py"
+      - "src/b3_secfem/solver.py"
+      - "tests/**"
+      - "ci/fenicsx-env.yml"
+      - ".github/workflows/fenicsx.yml"
+
+jobs:
+  fenicsx:
+    name: fenicsx (py3.12)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: ci/fenicsx-env.yml
+          init-shell: bash
+          cache-environment: true
+      - name: Run the suite
+        shell: bash -el {0}
+        run: python -m pytest -q --tb=short tests/

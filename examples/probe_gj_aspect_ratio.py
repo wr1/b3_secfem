@@ -7,7 +7,7 @@ with b > h, using the standard tabulated β coefficients.
 
 Run::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_gj_aspect_ratio.py
+    python examples/probe_gj_aspect_ratio.py
 """
 
 from __future__ import annotations

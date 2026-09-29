@@ -27,81 +27,17 @@ if TYPE_CHECKING:
 def read_xdmf(path: str | Path, comm=None) -> tuple[Any, Any]:
     """Read an XDMF mesh file produced by meshio or another dolfinx run.
 
-    Returns (mesh, cell_tags). cell_tags may be None if the file does
-    not carry tags.
+    Deprecated. Returns (mesh, cell_tags). cell_tags may be None.
     """
-    from dolfinx import io
-    from mpi4py import MPI
+    from ._deprecation import warn_deprecated
+    from .backends.fenicsx.io import read_xdmf as _read
 
-    if comm is None:
-        comm = MPI.COMM_WORLD
-    with io.XDMFFile(comm, str(path), "r") as xf:
-        # dolfinx names its grid "mesh"; meshio names it "Grid". The docstring
-        # has always claimed both are readable, but only the dolfinx name was
-        # ever tried, so a meshio-written file failed with a bare
-        # "<Grid> with name 'mesh' not found".
-        mesh = None
-        for grid in ("mesh", "Grid"):
-            try:
-                mesh = xf.read_mesh(name=grid)
-                break
-            except (RuntimeError, KeyError):
-                continue
-        if mesh is None:
-            msg = f"no readable <Grid> (tried 'mesh', 'Grid') in {path}"
-            raise RuntimeError(msg)
-        mesh.topology.create_connectivity(mesh.topology.dim, mesh.topology.dim)
-        cell_tags = None
-        for name in ("cell_tags", "mesh_tags", "Cell tags"):
-            try:
-                cell_tags = xf.read_meshtags(mesh, name=name)
-                break
-            except (RuntimeError, KeyError):
-                continue
-    if cell_tags is None:
-        cell_tags = _cell_tags_via_meshio(path, mesh)
-    return mesh, cell_tags
-
-
-def _cell_tags_via_meshio(path: str | Path, mesh: Any):
-    """Recover cell tags from a meshio-written XDMF.
-
-    dolfinx stores tags as a second ``<Grid>``; meshio stores them as an
-    ``<Attribute>`` inside the single grid, which ``read_meshtags`` cannot see.
-    So the geometry is read by dolfinx and the tags by meshio.
-
-    The two disagree on cell order — ``read_mesh`` permutes — so the file-order
-    tags are gathered through ``topology.original_cell_index``. Skipping that
-    step attaches materials to the wrong cells, silently.
-    """
-    try:
-        import meshio
-        import numpy as _np
-        from dolfinx.mesh import meshtags
-    except ImportError:
-        return None
-
-    try:
-        m = meshio.read(str(path))
-    except Exception:
-        return None
-
-    values = None
-    for name, blocks in (m.cell_data or {}).items():
-        if "tag" in name.lower():
-            values = _np.concatenate([_np.asarray(b).ravel() for b in blocks])
-            break
-    if values is None:
-        return None
-
-    dim = mesh.topology.dim
-    n = mesh.topology.index_map(dim).size_local
-    perm = mesh.topology.original_cell_index[:n]
-    ordered = _np.asarray(values, dtype=_np.int32)[perm]
-    mesh.topology.create_connectivity(dim, dim)
-    mt = meshtags(mesh, dim, _np.arange(n, dtype=_np.int32), ordered)
-    mt.name = "cell_tags"
-    return mt
+    warn_deprecated(
+        "mesh.read_xdmf",
+        "b3_secfem.backends.fenicsx.io.read_xdmf",
+        stacklevel=2,
+    )
+    return _read(path, comm=comm)
 
 
 def write_xdmf(
@@ -109,13 +45,20 @@ def write_xdmf(
     mesh: Any,
     cell_tags: Any | None = None,
 ) -> None:
-    """Write a dolfinx mesh (and optional cell tags) to XDMF."""
-    from dolfinx import io
+    """Write a dolfinx mesh (and optional cell tags) to XDMF.
 
-    with io.XDMFFile(mesh.comm, str(path), "w") as xf:
-        xf.write_mesh(mesh)
-        if cell_tags is not None:
-            xf.write_meshtags(cell_tags, mesh.geometry)
+    Deprecated. Prefer :func:`b3_secfem.mesh_io.write_section_mesh` for a
+    file both backends read.
+    """
+    from ._deprecation import warn_deprecated
+    from .backends.fenicsx.io import write_xdmf as _write
+
+    warn_deprecated(
+        "mesh.write_xdmf",
+        "b3_secfem.mesh_io.write_section_mesh",
+        stacklevel=2,
+    )
+    _write(path, mesh, cell_tags=cell_tags)
 
 
 def write_quad_xdmf(
@@ -139,43 +82,26 @@ def write_quad_xdmf(
     cells. Writing in input order removes that failure mode rather than
     handling it.
 
-    Winding is corrected in place (shoelace, same convention as the rest of the
-    package) and the corrected connectivity is returned.
+    Winding is corrected (see :func:`b3_secfem.mesh_io.orient_ccw`) and the
+    corrected connectivity is returned.
     """
-    import meshio
+    from .mesh_io import SectionMesh, orient_ccw, write_section_mesh
 
     coords = np.asarray(coords, dtype=np.float64)
-    quads = np.asarray(quads).copy()
-
-    p = coords[quads]
-    shoelace = (
-        p[:, 0, 0] * p[:, 1, 1]
-        - p[:, 1, 0] * p[:, 0, 1]
-        + p[:, 1, 0] * p[:, 2, 1]
-        - p[:, 2, 0] * p[:, 1, 1]
-        + p[:, 2, 0] * p[:, 3, 1]
-        - p[:, 3, 0] * p[:, 2, 1]
-        + p[:, 3, 0] * p[:, 0, 1]
-        - p[:, 0, 0] * p[:, 3, 1]
+    cells, _flip = orient_ccw(coords, np.asarray(quads))
+    tags = None if cell_tags is None else np.asarray(cell_tags, dtype=np.int32)
+    write_section_mesh(
+        path,
+        SectionMesh(
+            points=coords[:, :2],
+            cells=cells,
+            cell_type="quad",
+            cell_tags=tags,
+            cell_data={},
+            source=None,
+        ),
     )
-    flip = shoelace < 0
-    if flip.any():
-        quads[flip] = quads[flip][:, [0, 3, 2, 1]]
-
-    # meshio wants 3D points; the section lives in z = 0.
-    pts = np.zeros((coords.shape[0], 3), dtype=np.float64)
-    pts[:, :2] = coords
-
-    cell_data = None
-    if cell_tags is not None:
-        cell_data = {"cell_tags": [np.asarray(cell_tags, dtype=np.int32)]}
-
-    meshio.write(
-        str(path),
-        meshio.Mesh(points=pts, cells=[("quad", quads)], cell_data=cell_data),
-        file_format="xdmf",
-    )
-    return quads
+    return cells
 
 
 def solver_cell_tags(result: Any, mesh_path: str | Path) -> np.ndarray:
@@ -202,7 +128,9 @@ def solver_cell_tags(result: Any, mesh_path: str | Path) -> np.ndarray:
         msg = f"no cell tags found in {mesh_path}"
         raise ValueError(msg)
 
-    _, cell_tags = read_xdmf(mesh_path)
+    from .backends.fenicsx.io import read_xdmf as _read_xdmf
+
+    _, cell_tags = _read_xdmf(mesh_path)
     if cell_tags is None:
         msg = f"no cell tags found in {mesh_path}"
         raise ValueError(msg)
@@ -244,8 +172,16 @@ def cell_centroids(mesh: Any) -> np.ndarray:
     raise TypeError(msg)
 
 
-def from_gxbeam_vtu(path: str | Path) -> dict[str, Any]:
+def from_gxbeam_vtu(path: str | Path, *, swap23: bool = False) -> dict[str, Any]:
     """Ingest a gxbeam_section quad mesh from a VTU file.
+
+    Deprecated: returns a dict with a dolfinx mesh. Prefer
+    :func:`b3_secfem.mesh_io.read_section_mesh`, which keeps ``mat_props`` and
+    ``theta`` on :attr:`SectionMesh.cell_data`.
+
+    ``mat_props`` columns are read as
+    ``[E1, E2, E3, G12, G13, G23, nu12, nu13, nu23, rho]``. ``swap23=True``
+    relabels principal axes 2 and 3 (including G and the major Poisson ratio).
 
     Returns a dict::
 
@@ -255,55 +191,34 @@ def from_gxbeam_vtu(path: str | Path) -> dict[str, Any]:
             "mat_props":     np.ndarray (n_cells, 10) or None
             "theta":         np.ndarray (n_cells,)   or None     [rad]
         }
-
-    gxbeam stores per-element material properties (10 floats) and ply angle
-    (theta, radians). Quad winding must be CCW when viewed from +z; we
-    validate and flip if necessary.
     """
-    import meshio
-    from dolfinx import mesh as dmesh
-    from mpi4py import MPI
+    from ._deprecation import warn_deprecated
+    from .mesh_io import read_section_mesh
 
-    m = meshio.read(str(path))
-    quads = None
-    for cb in m.cells:
-        if cb.type == "quad":
-            quads = cb.data.astype(np.int64)
-            break
-    if quads is None:
+    warn_deprecated(
+        "mesh.from_gxbeam_vtu",
+        "b3_secfem.mesh_io.read_section_mesh",
+        stacklevel=2,
+    )
+    loaded = read_section_mesh(path)
+    if loaded.cell_type != "quad":
         msg = f"no quad cells in {path}"
         raise ValueError(msg)
 
-    nodes = m.points[:, :2].astype(np.float64)
-    n_cells = quads.shape[0]
+    from dolfinx import mesh as dmesh
+    from mpi4py import MPI
 
-    # Validate CCW winding (signed shoelace area > 0); flip non-CCW quads.
-    p = nodes[quads]
-    sa = (
-        p[:, 0, 0] * p[:, 1, 1]
-        - p[:, 1, 0] * p[:, 0, 1]
-        + p[:, 1, 0] * p[:, 2, 1]
-        - p[:, 2, 0] * p[:, 1, 1]
-        + p[:, 2, 0] * p[:, 3, 1]
-        - p[:, 3, 0] * p[:, 2, 1]
-        + p[:, 3, 0] * p[:, 0, 1]
-        - p[:, 0, 0] * p[:, 3, 1]
-    )
-    flip = sa < 0
-    if flip.any():
-        quads[flip] = quads[flip][:, [0, 3, 2, 1]]
-
-    # Convert CCW (BL, BR, TR, TL) -> dolfinx 0.10 tensor-product ordering
-    # (BL, TL, BR, TR) by the permutation [0, 3, 1, 2].
-    quads_dolfinx = quads[:, [0, 3, 1, 2]]
-
+    # CCW (BL, BR, TR, TL) -> dolfinx tensor-product (BL, TL, BR, TR).
+    quads_dolfinx = loaded.cells[:, [0, 3, 1, 2]]
     domain = _ufl_quad_domain()
-    dolfinx_mesh = dmesh.create_mesh(MPI.COMM_WORLD, quads_dolfinx, domain, nodes)
-
-    cell_data = m.cell_data_dict if hasattr(m, "cell_data_dict") else {}
-    mat_props = _extract_cell_array(cell_data, "mat_props", "quad", n_cells, 10)
-    theta = _extract_cell_array(cell_data, "theta", "quad", n_cells, None)
-
+    dolfinx_mesh = dmesh.create_mesh(
+        MPI.COMM_WORLD, quads_dolfinx, domain, np.asarray(loaded.points)
+    )
+    n_cells = loaded.cells.shape[0]
+    mat_props = _cell_array(loaded.cell_data, "mat_props", n_cells)
+    theta = _cell_array(loaded.cell_data, "theta", n_cells)
+    if mat_props is not None and swap23:
+        mat_props = _swap23_columns(mat_props)
     return {
         "mesh": dolfinx_mesh,
         "n_cells": n_cells,
@@ -321,20 +236,41 @@ def _ufl_quad_domain():
     return ufl.Mesh(e)
 
 
-def _extract_cell_array(
-    cell_data: dict, key: str, ctype: str, n_cells: int, expected_cols: int | None
-) -> np.ndarray | None:
-    """Pull a per-cell array out of meshio cell_data_dict; None if missing."""
+def _cell_array(cell_data: dict, key: str, n_cells: int) -> np.ndarray | None:
+    """Per-cell array from a :class:`SectionMesh`, or None when the key is absent."""
     if key not in cell_data:
         return None
-    arr = cell_data[key].get(ctype)
-    if arr is None:
-        return None
-    arr = np.asarray(arr)
+    arr = np.asarray(cell_data[key])
+    if arr.ndim == 2 and arr.shape[1] == 1:
+        arr = arr[:, 0]
     if arr.shape[0] != n_cells:
         msg = f"{key}: expected {n_cells} rows, got {arr.shape[0]}"
         raise ValueError(msg)
-    if expected_cols is not None and arr.ndim == 2 and arr.shape[1] != expected_cols:
-        msg = f"{key}: expected {expected_cols} cols, got {arr.shape[1]}"
+    return arr
+
+
+def _swap23_columns(mat_props: np.ndarray) -> np.ndarray:
+    """Relabel principal 2 ↔ 3 on gxbeam ``mat_props`` columns.
+
+    Column order is ``[E1, E2, E3, G12, G13, G23, nu12, nu13, nu23, rho]``.
+    ``nu32 = nu23 * E3 / E2`` becomes the new ``nu23``.
+    """
+    arr = np.array(mat_props, dtype=np.float64, copy=True)
+    if arr.ndim != 2 or arr.shape[1] != 10:
+        msg = f"mat_props must be (n, 10), got {arr.shape}"
         raise ValueError(msg)
+    e2 = arr[:, 1].copy()
+    e3 = arr[:, 2].copy()
+    g12 = arr[:, 3].copy()
+    g13 = arr[:, 4].copy()
+    nu12 = arr[:, 6].copy()
+    nu13 = arr[:, 7].copy()
+    nu23 = arr[:, 8].copy()
+    arr[:, 1] = e3
+    arr[:, 2] = e2
+    arr[:, 3] = g13
+    arr[:, 4] = g12
+    arr[:, 8] = nu23 * e3 / e2
+    arr[:, 6] = nu13
+    arr[:, 7] = nu12
     return arr

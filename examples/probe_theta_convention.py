@@ -12,7 +12,7 @@ z (which leaves K[Fz,Fz] invariant). Hypothesis: gxbeam.theta == b3_secfem.alpha
 
 Run with::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_theta_convention.py
+    python examples/probe_theta_convention.py
 """
 
 from __future__ import annotations

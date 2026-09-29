@@ -1,6 +1,6 @@
 [project]
 name = "b3_secfem"
-version = "0.1.0"
+version = "0.2.0.dev0"
 description = "Lightweight FEniCSx-based 2D cross-section property solver for composite blade/wing sections."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,15 +12,15 @@ license = "MIT"
 # `uv venv --system-site-packages` so they remain visible.
 dependencies = [
     "meshio>=5.3",
+    "h5py>=3.8",
     # Standalone fenicsx environments need numpy<2 to match the ABI of the
     # system (apt) fenics-dolfinx / petsc4py build (numpy 1.26.x): re-pin there
     # with `uv pip install 'numpy<2'` (see Makefile). Unpinned here because the
     # monorepo workspace needs numpy>=2 (frd2vtu via the CalculiX interface)
     # and the dolfinx backend is optional in-workspace.
     "numpy",
-    "pydantic>=2",
+    "pydantic>=2.6",
     "rich",
-    "b3_mat",
     # PyMFEM 4.8+ ships manylinux wheels only (numpy-1/2 agnostic); the sdist
     # asserts on Windows. Older versions are sdist-only and need a native MFEM
     # toolchain. Core on Linux so every workspace `uv sync` keeps a
@@ -30,7 +30,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff", "matplotlib", "pre-commit", "numba>=0.59"]
+b3mat = ["b3_mat @ git+https://github.com/wr1/b3_mat.git@135fc4d4384d6470045b5776025ab9e41c35a176"]
+viz = ["matplotlib>=3.7"]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff",
+    "pre-commit",
+    "import-linter>=2",
+    "b3_secfem[viz,numba]",
+]
 # Optional fast path for mfem bulk assembly (falls back to numpy bulk / python integrator).
 numba = ["numba>=0.59"]
 # airfoilmesh is the sibling ``b3_af`` package (not published to PyPI). The
@@ -57,12 +66,22 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = ["src/b3_secfem"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["public/", "examples/", ".githooks/", "dockb.json", "uv.lock"]
+
 # In the b3_master uv workspace, b3_mat resolves via `workspace = true` and
 # airfoilmesh is unused. For standalone use, the Makefile's `install` target
 # installs both as path-editable sources (../b3_mat, ../b3_af).
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["b3_secfem"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
 
 [tool.ruff]
 line-length = 88

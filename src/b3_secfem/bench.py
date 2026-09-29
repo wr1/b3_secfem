@@ -2,7 +2,7 @@
 
 Why this exists
 ---------------
-The fenicsx backend is built on the system (apt) dolfinx, which links PETSc
+The fenicsx backend is built on the system (apt) FEniCSx stack, which links PETSc
 and MPI; the mfem backend links its own native libraries. Importing both into
 a single interpreter works for assembly, but PETSc/MPI atexit teardown then
 segfaults the process on exit, and the fenicsx CSR view can alias PETSc memory
@@ -11,16 +11,15 @@ backend is exercised in its own short-lived subprocess that serialises its
 result to disk -- which is what :func:`assemble_in_subprocess` does. As a bonus
 the subprocess measures only the assembly call, not interpreter/library import.
 
-The comparison is **permutation-invariant**: dolfinx and mfem number their
+The comparison is **permutation-invariant**: the two backends number their
 global DOFs differently, so the assembled operators are equal only up to a
 symmetric permutation ``P A Pᵀ``. We therefore compare the sorted eigenvalue
 spectrum, the trace, and the rigid-body null-space dimension -- all invariant
 under such a permutation -- rather than entrywise differences.
 
-This currently covers the core in-plane stiffness operator ``E`` (the bilinear
-form shared by every warping solve), which is the part of the mfem backend that
-is fully implemented. The end-to-end 6x6 ``K`` comparison will be added here
-once the mfem chain solve / R-S assembly is complete.
+:func:`run_comparison` covers the in-plane stiffness operator ``E``.
+:func:`run_full_comparison` covers the end-to-end 6×6 ``K``, ``M``, and centres.
+:func:`run_strain_comparison` covers recovered basis and unit-load strains.
 """
 
 from __future__ import annotations
@@ -77,7 +76,7 @@ from b3_secfem.backends import get_backend
 be = get_backend(backend)
 
 if backend == "fenicsx":
-    from b3_secfem.mesh import read_xdmf
+    from b3_secfem.backends.fenicsx.io import read_xdmf
     mesh, _ = read_xdmf(mesh_path)
     mesh.topology.create_connectivity(mesh.topology.dim, mesh.topology.dim)
     n_cells = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -259,20 +258,8 @@ basis = recover_strains(res)
 unit = recover_unit_load_strains(res)
 t1 = time.perf_counter()
 
-if backend == "mfem":
-    import mfem.ser as mfem
-    m = res.mesh
-    c = np.zeros((m.GetNE(), 2))
-    v = mfem.Vector(2)
-    for e in range(m.GetNE()):
-        m.GetElementCenter(e, v)
-        c[e] = v.GetDataArray()[:2]
-else:
-    from dolfinx import mesh as dmesh
-    m = res.mesh
-    dim = m.topology.dim
-    n = m.topology.index_map(dim).size_local
-    c = dmesh.compute_midpoints(m, dim, np.arange(n, dtype=np.int32))[:, :2]
+from b3_secfem.mesh import cell_centroids
+c = cell_centroids(res.mesh)
 
 np.savez(out_npz, eps=basis.epsilon, sig=basis.sigma,
          eps_unit=unit.epsilon, sig_unit=unit.sigma,
@@ -349,24 +336,16 @@ def run_strain_comparison(mat_key: str = "iso", nx: int = 12, ny: int = 8) -> di
 
 
 # ---------------------------------------------------------------------------
-# Mesh generation (dolfinx, written to XDMF both backends can read)
+# Mesh generation (structured quads, written to XDMF both backends can read)
 # ---------------------------------------------------------------------------
 
 
 def make_rectangle_xdmf(path: str | Path, a=0.2, b=0.1, nx=16, ny=10) -> None:
     """Write a structured quad rectangle to XDMF (consumed by both backends)."""
-    from dolfinx import mesh as dmesh
-    from mpi4py import MPI
+    from .geometry import rectangle
 
-    from b3_secfem import write_xdmf
-
-    m = dmesh.create_rectangle(
-        MPI.COMM_WORLD,
-        [(-a / 2, -b / 2), (a / 2, b / 2)],
-        [nx, ny],
-        cell_type=dmesh.CellType.quadrilateral,
-    )
-    write_xdmf(path, m)
+    mesh, _info = rectangle(a, b, nx, ny)
+    mesh.write(path)
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,6 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from .forms import d0_kinematic, total_strain_voigt
 from .result import SectionResult
 from .solver import ALL_MODES, STAGE2_MODES
 
@@ -124,6 +123,8 @@ def recover_strains(result: SectionResult) -> StrainField:
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_vector
+
+    from .forms import d0_kinematic, total_strain_voigt
 
     if result.u_solutions is None or result.C_func is None or result.mesh is None:
         msg = "result lacks dolfinx state (was it constructed manually?)"

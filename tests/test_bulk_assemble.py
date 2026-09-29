@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
-
 import numpy as np
 import pytest
 
@@ -20,30 +18,26 @@ from b3_secfem.materials import IsotropicMaterial  # noqa: E402
 
 
 def _rect_mesh_and_C(nx=8, ny=6, degree=2):
+    import tempfile
+    from pathlib import Path
+
     import mfem.ser as mfem
 
-    # Build via the same meshio path as the backend (temp xdmf from fenicsx if available)
-    dolfinx_ok = importlib.util.find_spec("dolfinx") is not None
-    if dolfinx_ok:
-        import tempfile
-        from pathlib import Path
+    from b3_secfem.config import RegionMat, SectionInput
+    from b3_secfem.geometry import rectangle
 
-        from b3_secfem.bench import make_rectangle_xdmf
-        from b3_secfem.config import RegionMat, SectionInput
-
-        mat = IsotropicMaterial(E=100e9, nu=0.3, rho=2000.0)
-        with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "m.xdmf"
-            make_rectangle_xdmf(path, nx=nx, ny=ny)
-            inp = SectionInput(
-                mesh_path=path,
-                region_materials={1: RegionMat(material=mat)},
-                degree=degree,
-                backend="mfem",
-            )
-            mesh, _tags, n_cells = mfem_be._load_mfem_mesh(inp)
-    else:
-        pytest.skip("dolfinx needed to build shared test mesh")
+    mat = IsotropicMaterial(E=100e9, nu=0.3, rho=2000.0)
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "m.xdmf"
+        section, _info = rectangle(0.2, 0.1, nx, ny)
+        section.write(path)
+        inp = SectionInput(
+            mesh_path=path,
+            region_materials={1: RegionMat(material=mat)},
+            degree=degree,
+            backend="mfem",
+        )
+        mesh, _tags, n_cells = mfem_be._load_mfem_mesh(inp)
 
     for e in range(n_cells):
         mesh.GetElement(e).SetAttribute(e + 1)

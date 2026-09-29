@@ -95,8 +95,8 @@ Many medium jobs (e.g. surrogate sweeps) care about **warm** wall time and
 - Prefer **`linear_solver="lu"`** on medium meshes (default CG+GAMG is setup-heavy).
 - **One long-lived spawn pool**, `prepare_env` / `warm_up` once per worker, shared
   `XDG_CACHE_HOME` (see **[SKILL.md](SKILL.md)**).
-- Profile: `examples/profile_speed.py`, `examples/compare_assemble_speed.py`,
-  `notes/mind/speed.md`.
+- Profile: `examples/profile_speed.py`, `examples/compare_assemble_speed.py`.
+  Measured warm-solve numbers are in [SKILL.md](SKILL.md).
 
 ### Cross-backend checks
 
@@ -127,14 +127,19 @@ values to machine precision for isotropic sections.
 
 Transverse shear (Fx, Fy) is obtained from the Stage-2 d₂ warping
 solution in the Morandini chain (E d₂ = M d₀ − H d₁, with ε_total for the
-shear modes assembled from d₂; see `notes/claude.md`). For simple sections
+shear modes assembled from d₂; see
+[docs/theory/cell-problem.mdx](docs/theory/cell-problem.mdx)). For simple sections
 this reproduces the expected Saint-Venant values — e.g. K[Fx, Fx] =
 K[Fy, Fy] = (5/6) G A for an isotropic rectangle (verified to mesh
 tolerance in `tests/test_iso_rectangle.py`). Complex airfoils exhibit
 mesh-convergence differences versus gxbeam_section on the shear terms (as
-on torsion); these are documented in the cross-check driver and notes.
+on torsion); these are documented in the cross-check driver and under
+[docs/validation/](docs/validation/).
 
-The solver and visualization tools are serial-only (single MPI rank). Per-cell material assignment and recovery assume local cell counts match the input arrays. Parallel execution is not yet supported.
+The solver and visualization tools are serial-only (single MPI rank).
+Per-cell material assignment and recovery assume local cell counts match
+the input arrays. Parallelism is across section jobs, not MPI ranks of
+one section.
 
-See `notes/claude.md` for project context and `notes/theory.md` for the
-mathematical formulation.
+See [docs/index.mdx](docs/index.mdx) for the DocKB overview and
+[docs/theory/](docs/theory/) for the mathematical formulation.

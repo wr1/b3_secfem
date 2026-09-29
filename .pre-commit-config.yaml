@@ -7,6 +7,8 @@
 #
 # Rule config lives in pyproject.toml. Scoped to src/ + tests/ (matches
 # `make lint`; examples/ stay out of the gate).
+ci:
+  autoupdate_schedule: monthly
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.14
@@ -21,9 +23,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        files: ^(src|tests|README\.md|pyproject\.toml)$
+        files: ^(src/|tests/|README\.md$|pyproject\.toml$)
       - id: end-of-file-fixer
-        files: ^(src|tests|README\.md|pyproject\.toml)$
+        files: ^(src/|tests/|README\.md$|pyproject\.toml$)
       - id: check-yaml
       - id: check-added-large-files
         args: [--maxkb=500]

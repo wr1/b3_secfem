@@ -1,0 +1,11 @@
+name: b3secfem-ci
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - fenics-dolfinx>=0.9
+  - mpich
+  - petsc4py
+  - pip
+  - pip:
+      - -e ".[dev]"

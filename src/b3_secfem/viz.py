@@ -175,7 +175,7 @@ def _mesh_and_tags(res: SectionResult, inp: SectionInput):
     mesh = res.mesh
     tags = None
     if inp.region_materials is not None:
-        from .mesh import read_xdmf
+        from .backends.fenicsx.io import read_xdmf
 
         try:
             _, mt = read_xdmf(inp.mesh_path)

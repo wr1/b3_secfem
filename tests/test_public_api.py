@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,6 +40,26 @@ def test_write_quad_xdmf_from_package_root(tmp_path: Path):
     assert fixed.shape == (1, 4)
 
 
+def test_materials_from_b3_mat_missing_raises(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _block(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
+        if name == "b3_mat" or name.startswith("b3_mat."):
+            raise ImportError("blocked for test")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _block)
+    monkeypatch.delitem(sys.modules, "b3_mat", raising=False)
+    with pytest.raises(ImportError, match=r"b3_secfem\[b3mat\]"):
+        materials_from_b3_mat(object())
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("b3_mat") is None,
+    reason="name fallback runs only after b3_mat imports",
+)
 def test_materials_from_b3_mat_name_fallback_iso():
     class IsotropicMaterial:  # noqa: N801 — mirrors b3_mat type name
         pass
@@ -53,6 +75,10 @@ def test_materials_from_b3_mat_name_fallback_iso():
     assert out.nu == 0.33
 
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("b3_mat") is None,
+    reason="name fallback runs only after b3_mat imports",
+)
 def test_materials_from_b3_mat_name_fallback_ortho():
     class OrthotropicMaterial:  # noqa: N801
         pass
@@ -75,6 +101,10 @@ def test_materials_from_b3_mat_name_fallback_ortho():
     assert out.G12 == 5e9
 
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("b3_mat") is None,
+    reason="type check runs only after b3_mat imports",
+)
 def test_materials_from_b3_mat_rejects_unknown():
     class NotAMat:
         pass
@@ -136,6 +166,26 @@ def test_material_and_strain_fields_import_from_root():
     assert Material == IsotropicMaterial | OrthotropicMaterial
     assert StrainField is b3_secfem.StrainField
     assert UnitLoadStrainField is b3_secfem.UnitLoadStrainField
+
+
+def test_import_does_not_load_heavy_modules():
+    """``import b3_secfem`` stays at pydantic + numpy. FEM and scipy stay lazy."""
+    import subprocess
+
+    code = (
+        "import sys\n"
+        "import b3_secfem\n"
+        "bad = [m for m in ('scipy','ufl','dolfinx','mfem','matplotlib','meshio') "
+        "if m in sys.modules or any(k.startswith(m + '.') for k in sys.modules)]\n"
+        "raise SystemExit('loaded ' + ','.join(bad) if bad else 0)\n"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-X", "importtime", "-c", code],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr + proc.stdout
 
 
 def test_strain_fields_reject_non_ndarray():

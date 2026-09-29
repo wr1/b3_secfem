@@ -12,7 +12,7 @@ If the disagreement collapses to <1 %, it's mesh-specific.
 
 Run::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_ud_ellipse.py
+    python examples/probe_ud_ellipse.py
 """
 
 from __future__ import annotations

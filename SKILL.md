@@ -33,7 +33,7 @@ Rectangle ladder, fresh spawn subprocess per config
 - **mfem** avoids JIT but loses badly on medium meshes (Python element loop). Cross-check only; multi-grid XDMF incomplete for real laminates.
 - Warm fenicsx+lu is already strong; a future C++ port is only ~1.5–2× e2e, not 10×.
 
-Details: `notes/mind/speed.md`.
+The table above is the measured record.
 
 ## Required runner pattern (batch + avoid JIT)
 
@@ -54,7 +54,7 @@ parent:  prepare_env() / pin OMP=1 / XDG_CACHE_HOME shared
 | Warm each worker once | `b3_secfem.warm_up(linear_solver="lu", recover=True)` in initializer |
 | Share FFCx cache | `prepare_env()` → `XDG_CACHE_HOME` → `…/fenics` |
 | Pin threads | `OMP/OPENBLAS/MKL_NUM_THREADS=1` when N_proc > 1 |
-| Medium sections | `SectionInput(..., linear_solver="lu")` or `B3_SECFEM_LINEAR_SOLVER=lu` |
+| Medium sections | `SectionInput(..., linear_solver="lu")` |
 | Submit all jobs up front | saturate the pool; no serial “start process per design” |
 
 ### Do not
@@ -83,7 +83,10 @@ inp = SectionInput(
 res = solve(inp)
 ```
 
-Env knobs (used by `b3_invsec`):
+## b3_invsec integration
+
+These environment variables are read by `b3_invsec`, not by `b3_secfem`.
+`b3_secfem` takes `backend` and `linear_solver` on `SectionInput`.
 
 | Variable | Default (invsec) | Meaning |
 |----------|------------------|---------|
@@ -91,8 +94,6 @@ Env knobs (used by `b3_invsec`):
 | `B3_SECFEM_LINEAR_SOLVER` | `lu` | `lu` \| `gamg` \| `ilu` (fenicsx only) |
 | `B3_SECFEM_SKIP_WARMUP` | unset | `1` skips dummy solve (debug) |
 | `XDG_CACHE_HOME` | `~/.cache` | FFCx under `$XDG_CACHE_HOME/fenics` |
-
-## b3_invsec integration
 
 `b3_invsec.dataset._evaluate_jobs` already:
 
@@ -146,8 +147,8 @@ Default mfem assembly uses bulk+numba when installed (`B3_SECFEM_MFEM_ASSEMBLE`)
 | `python` | original `PyBilinearFormIntegrator` |
 
 Numba kernel ≈ fenicsx on **E assembly alone**; tabulation + chain recovery still
-leave full mfem solve slower than warm fenicsx+lu. See `notes/mind/speed.md`
-and `examples/compare_assemble_speed.py`.
+leave full mfem solve slower than warm fenicsx+lu. See
+`examples/compare_assemble_speed.py`.
 
 ## Out of scope (for now)
 

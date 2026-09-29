@@ -39,7 +39,6 @@ class SectionResult(BaseModel):
     M: np.ndarray
     S: np.ndarray
     R: np.ndarray
-    backend: str = "fenicsx"
     """6x6 basis-resultant matrix: R[a, i] = a-th generalised-force resultant
     of the i-th chain-basis strain field. Together with the energy matrix,
     ``K = R @ inv(S_energy) @ R^T``. Needed by ``recover_unit_load_strains``
@@ -47,6 +46,7 @@ class SectionResult(BaseModel):
     ``gamma = inv(R) @ e_k`` — the basis amplitudes are NOT generalised
     strains (see solver.py module docstring), so ``inv(K)`` is the wrong
     weighting."""
+    backend: str = "fenicsx"
     shear_center: tuple[float, float]
     tension_center: tuple[float, float]
     elastic_center: tuple[float, float]

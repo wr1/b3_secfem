@@ -31,9 +31,8 @@ micromamba run -n b3secfem python examples/validation/plot_compare.py
 | `afmesh_naca.py` | NACA 0018 hollow: glass-biax skin, carbon-UD spar caps, one biax web. 1:1 vs swap23. |
 | `plot_compare.py` | Rebuild all comparison figures from the JSON above. |
 
-JSON and PNG land in `out/` (gitignored). `plot_compare.py` also copies the
-figures into `notes/mind/two3/` so the report images load. Narrative:
-`notes/mind/two3-report.md`.
+JSON and PNG land in `out/` (gitignored). Narrative and figures also live
+under [docs/validation/](../../docs/validation/).
 
 Force order in every secfem JSON: `[Fx, Fy, Fz, Mx, My, Mz]`.
 
@@ -41,4 +40,4 @@ Figures (colour = mismatch *source*, not solver name): `mismatch_map.png`,
 `mismatch_sources.png`, `source_23.png`, `source_gxbeam.png`, `two3_axes.png`,
 `two3_ea.png`, `afmesh_naca.png`.
 
-Findings: `notes/mind/two3-report.md`.
+Findings: [docs/validation/known-residuals.mdx](../../docs/validation/known-residuals.mdx).

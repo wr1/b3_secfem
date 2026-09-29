@@ -131,6 +131,24 @@ def test_iso_rectangle_K_section_xy(tmp_path, iso_steel):
     np.testing.assert_allclose(res.K_section_xy, G * a * b, rtol=1e-6)
 
 
+def test_solve_backend_kwarg_matches_default(tmp_path, iso_steel):
+    """solve(..., backend="fenicsx") matches the default on a meshio rectangle."""
+    from b3_secfem.geometry import rectangle
+
+    section, _info = rectangle(0.1, 0.1, 4, 4)
+    path = section.write(tmp_path / "tiny.xdmf")
+    inp = SectionInput(
+        mesh_path=path,
+        region_materials={1: RegionMat(material=iso_steel)},
+    )
+    res_default = solve(inp)
+    res_explicit = solve(inp, backend="fenicsx")
+    assert res_default.backend == "fenicsx"
+    assert res_explicit.backend == "fenicsx"
+    np.testing.assert_allclose(res_default.K, res_explicit.K, rtol=1e-12)
+    np.testing.assert_allclose(res_default.M, res_explicit.M, rtol=1e-12)
+
+
 def test_iso_rectangle_centres_at_origin(tmp_path, iso_steel):
     """Symmetric rectangle has tension, elastic (mass) and mass centres at the origin."""
     a = b = 0.10

@@ -142,3 +142,72 @@ def test_mfem_rectangle_matches_closed_form():
     assert np.isclose(res.K[4, 4], E * b * a**3 / 12, rtol=1e-9)  # E*Iyy
     assert np.isclose(res.M[0, 0], rho * A, rtol=1e-9)  # rho*A
     assert np.isclose(res.K_section_xy, G * A, rtol=1e-6)  # G*A
+
+
+def test_legacy_region_key_backends_agree(tmp_path):
+    """A meshio file tagged ``region`` gives the same K on both backends.
+
+    The two solves run in separate processes. Loading dolfinx and mfem in one
+    interpreter assembles, then segfaults at teardown.
+    """
+    import json
+    import subprocess
+    import sys
+
+    import meshio
+    import numpy as np
+
+    a, b, nx, ny = 0.2, 0.04, 6, 4
+    xs = np.linspace(-a / 2, a / 2, nx + 1)
+    ys = np.linspace(-b / 2, b / 2, ny + 1)
+    coords = np.array([[x, y, 0.0] for y in ys for x in xs], dtype=np.float64)
+    quads, tags = [], []
+    for j in range(ny):
+        for i in range(nx):
+            n0 = j * (nx + 1) + i
+            quads.append([n0, n0 + 1, n0 + 1 + (nx + 1), n0 + (nx + 1)])
+            tags.append(2 if i >= nx // 2 else 1)
+    path = tmp_path / "strip.xdmf"
+    meshio.write(
+        path,
+        meshio.Mesh(
+            coords,
+            [("quad", np.asarray(quads, dtype=np.int64))],
+            cell_data={"region": [np.asarray(tags, dtype=np.int32)]},
+        ),
+    )
+    script = """
+import json, sys
+from b3_secfem import IsotropicMaterial, RegionMat, SectionInput, solve
+path, backend = sys.argv[1], sys.argv[2]
+steel = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
+alu = IsotropicMaterial(E=70e9, nu=0.33, rho=2700.0)
+inp = SectionInput(
+    mesh_path=path,
+    region_materials={
+        1: RegionMat(material=steel),
+        2: RegionMat(material=alu),
+    },
+    backend=backend,
+    degree=2,
+)
+res = solve(inp)
+json.dump(res.K.tolist(), sys.stdout)
+"""
+
+    def run(backend: str) -> np.ndarray:
+        proc = subprocess.run(
+            [sys.executable, "-c", script, str(path), backend],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise AssertionError(f"{backend} failed:\n{proc.stderr}")
+        return np.asarray(json.loads(proc.stdout), dtype=float)
+
+    fen = run("fenicsx")
+    mf = run("mfem")
+    # Elementwise rtol treats ~0 coupling entries as failures. Scale by ||K||.
+    scale = max(float(np.abs(fen).max()), float(np.abs(mf).max()), 1.0)
+    assert float(np.max(np.abs(fen - mf))) / scale < 1e-10

@@ -11,7 +11,7 @@ elements — the airfoil shape stays the same minus two thin slivers.
 
 Run::
 
-    /home/wr1/projects/b3/b3_secfem/.venv/bin/python examples/probe_airfoil_3way.py
+    python examples/probe_airfoil_3way.py
 """
 
 from __future__ import annotations

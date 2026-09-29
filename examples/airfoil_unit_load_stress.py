@@ -19,15 +19,10 @@ This script demonstrates the new ``recover_unit_load_strains`` API:
 
 Run (from the project root)::
 
-    # Using the project's .venv (if it has a working dolfinx)
-    .venv/bin/python examples/airfoil_unit_load_stress.py
+    python examples/airfoil_unit_load_stress.py
 
-    # Recommended: the mamba/conda environment that actually contains fenicsx
-    # (the one that has a healthy dolfinx + compatible numpy/petsc4py)
-    micromamba run -n b3secfem bash -c '
-        cd /home/wr1/projects/b3/b3_secfem
-        PYTHONPATH=src python examples/airfoil_unit_load_stress.py
-    '
+    # Recommended: the mamba/conda environment that contains fenicsx
+    micromamba run -n b3secfem python examples/airfoil_unit_load_stress.py
 
 Output goes to ``examples/airfoil_stress_out/``.
 """

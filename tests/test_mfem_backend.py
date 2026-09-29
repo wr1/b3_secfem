@@ -4,11 +4,8 @@ These tests are designed to run in two modes:
 - Without mfem installed (most CI / developer machines): the mfem-specific
   tests are skipped; the dispatcher, config validation, and fenicsx path are
   still exercised.
-- With mfem installed: the NotImplementedError for the incomplete kernel is
-  asserted, proving the routing works.
-
-The goal is to protect the refactoring done for the MFEM backend addition
-while the numeric kernel (custom integrators) is still being implemented.
+- With mfem installed: the full chain solve is exercised. Numeric agreement
+  with fenicsx lives in ``tests/test_backend_comparison.py``.
 """
 
 from __future__ import annotations
@@ -69,40 +66,55 @@ def test_get_backend_fenicsx_always_available():
     assert hasattr(be, "solve")
 
 
-def test_solve_explicit_backend_fenicsx_kwarg(tmp_path):
-    """solve(..., backend="fenicsx") must behave identically to the default."""
-    # We only need the module to be importable; the actual heavy test that
-    # exercises a full solve lives in test_iso_rectangle.py (which we can
-    # also call with the kwarg).
-    pytest.importorskip("dolfinx")
-    from dolfinx import mesh as dmesh
-    from mpi4py import MPI
+def test_mfem_reads_two_grid_tags(tmp_path):
+    """A dolfinx two-grid file keeps cell tags in file order on the MFEM mesh."""
+    pytest.importorskip("mfem")
+    import h5py
 
-    from b3_secfem import write_xdmf
-
-    # tiny mesh
-    m = dmesh.create_rectangle(
-        MPI.COMM_WORLD,
-        [(-0.05, -0.05), (0.05, 0.05)],
-        [4, 4],
-        cell_type=dmesh.CellType.quadrilateral,
+    points = np.array(
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [2.0, 0.0], [2.0, 1.0]],
+        dtype=np.float64,
     )
-    p = tmp_path / "tiny_rect.xdmf"
-    write_xdmf(p, m)
-
-    mat = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
+    cells = np.array([[0, 1, 2, 3], [1, 4, 5, 2]], dtype=np.int64)
+    tags = np.array([[3], [9]], dtype=np.int32)
+    h5_path = tmp_path / "two.h5"
+    with h5py.File(h5_path, "w") as handle:
+        handle.create_dataset("/Mesh/mesh/geometry", data=points)
+        handle.create_dataset("/Mesh/mesh/topology", data=cells)
+        handle.create_dataset("/MeshTags/cell_tags/Values", data=tags)
+    xdmf = tmp_path / "two.xdmf"
+    xdmf.write_text(
+        """<?xml version="1.0"?>
+<Xdmf Version="3.0">
+  <Domain>
+    <Grid Name="mesh" GridType="Uniform">
+      <Topology TopologyType="Quadrilateral" NumberOfElements="2" NodesPerElement="4">
+        <DataItem Dimensions="2 4" Format="HDF">two.h5:/Mesh/mesh/topology</DataItem>
+      </Topology>
+      <Geometry GeometryType="XY">
+        <DataItem Dimensions="6 2" Format="HDF">two.h5:/Mesh/mesh/geometry</DataItem>
+      </Geometry>
+    </Grid>
+    <Grid Name="cell_tags" GridType="Uniform">
+      <Attribute Name="cell_tags" AttributeType="Scalar" Center="Cell">
+        <DataItem Dimensions="2 1" Format="HDF">two.h5:/MeshTags/cell_tags/Values</DataItem>
+      </Attribute>
+    </Grid>
+  </Domain>
+</Xdmf>
+"""
+    )
+    mat = IsotropicMaterial(E=1.0, nu=0.3, rho=1.0)
     inp = SectionInput(
-        mesh_path=p,
-        region_materials={1: RegionMat(material=mat)},
+        mesh_path=xdmf,
+        region_materials={3: RegionMat(material=mat), 9: RegionMat(material=mat)},
+        backend="mfem",
     )
+    from b3_secfem.backends.mfem import _load_mfem_mesh
 
-    res_default = solve(inp)
-    res_explicit = solve(inp, backend="fenicsx")
-
-    assert res_default.backend == "fenicsx"
-    assert res_explicit.backend == "fenicsx"
-    np.testing.assert_allclose(res_default.K, res_explicit.K, rtol=1e-12)
-    np.testing.assert_allclose(res_default.M, res_explicit.M, rtol=1e-12)
+    _mesh, got, n_cells = _load_mfem_mesh(inp)
+    assert n_cells == 2
+    assert got.tolist() == [3, 9]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -125,21 +137,11 @@ def test_mfem_backend_full_solve_runs(tmp_path):
     backend produces a complete SectionResult on a real mesh.
     """
     pytest.importorskip("mfem")
-    pytest.importorskip("dolfinx")  # used only to build the mesh file
 
-    from dolfinx import mesh as dmesh
-    from mpi4py import MPI
+    from b3_secfem.geometry import rectangle
 
-    from b3_secfem import write_xdmf
-
-    m = dmesh.create_rectangle(
-        MPI.COMM_WORLD,
-        [(-0.05, -0.05), (0.05, 0.05)],
-        [4, 4],
-        cell_type=dmesh.CellType.quadrilateral,
-    )
-    p = tmp_path / "tiny.xdmf"
-    write_xdmf(p, m)
+    section, info = rectangle(0.1, 0.1, 4, 4)
+    p = section.write(tmp_path / "tiny.xdmf")
 
     mat = IsotropicMaterial(E=210e9, nu=0.3, rho=7850.0)
     inp = SectionInput(
@@ -154,7 +156,7 @@ def test_mfem_backend_full_solve_runs(tmp_path):
     assert np.all(np.isfinite(res.K))
     # axial stiffness must be positive and ~ E*A
     assert res.K[2, 2] > 0
-    assert np.isclose(res.K[2, 2], 210e9 * 0.01, rtol=1e-6)
+    assert np.isclose(res.K[2, 2], 210e9 * info["A"], rtol=1e-6)
 
 
 def test_mfem_module_can_be_imported_without_side_effects():

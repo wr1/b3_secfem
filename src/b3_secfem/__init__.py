@@ -21,6 +21,7 @@ Backend-dependent surface (import on use; only the chosen backend's deps are req
     to_gxbeam_order, from_gxbeam_order, to_anba_order
 """
 
+from ._deprecation import B3SecfemDeprecationWarning, warn_deprecated
 from .adapters import (
     anba_to_secfem_angles,
     anba_to_secfem_input,
@@ -101,10 +102,10 @@ def solver_cell_tags(result, mesh_path):
     return _s(result, mesh_path)
 
 
-def from_gxbeam_vtu(path):
+def from_gxbeam_vtu(path, *, swap23: bool = False):
     from .mesh import from_gxbeam_vtu as _f
 
-    return _f(path)
+    return _f(path, swap23=swap23)
 
 
 def plot_section(inp, res, out_path, **kwargs):
@@ -143,6 +144,7 @@ def warm_up(**kwargs):
 
 
 __all__ = [
+    "B3SecfemDeprecationWarning",
     "anba_to_secfem_angles",
     "anba_to_secfem_input",
     "assemble_resultants_from_sigma",
@@ -179,5 +181,6 @@ __all__ = [
     "to_gxbeam_order",
     "warm_up",
     "write_quad_xdmf",
+    "warn_deprecated",
     "write_xdmf",
 ]
