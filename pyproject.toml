@@ -1,6 +1,6 @@
 [project]
 name = "b3_secfem"
-version = "0.1.0"
+version = "0.2.1"
 description = "Lightweight FEniCSx-based 2D cross-section property solver for composite blade/wing sections."
 readme = "README.md"
 requires-python = ">=3.11"

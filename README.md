@@ -114,7 +114,7 @@ make test-pure                        # no dolfinx (matches CI unit job)
 make test                             # full suite (needs fenicsx env — see Makefile)
 ```
 
-Release: tag `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) → GitHub
+Release: tag `v*` (e.g. `git tag v0.2.1 && git push origin v0.2.1`) → GitHub
 Actions builds sdist/wheel and creates a Release. PyPI publish is optional
 (OIDC stub in `.github/workflows/release.yml`).
 
